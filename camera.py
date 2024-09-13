@@ -18,12 +18,12 @@ class custom_camera:
         b2 = np.array([0, 0, -1],dtype=np.float32) # y is maximally aligned downward
         b1 = unit(np.cross(b2, b3)) # x completes the triad
         b2 = unit(np.cross(b3, b1)) # y is orthogonalized
-        self.R = np.column_stack((b1, b2, b3)).T
+        self.R = np.column_stack((b1, b2, b3))
         # self.R = normalize_dcm(self.R)
         self.E = create_extrinsic_matrix(self.R,self.t)
         
     def world2camera(self, point_world):
-        point_camera = self.R @ (point_world - self.t).reshape([-1,1])
+        point_camera = self.R.T @ (point_world - self.t).reshape([-1,1])
         # E = np.hstack((self.R, (self.t).reshape(-1, 1)))
 
         # point_camera = E @ point_world_aug
