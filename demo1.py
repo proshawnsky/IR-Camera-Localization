@@ -22,7 +22,10 @@ colors = ['r','g','b','m']
 success = spacenavigator.open()
 
 # Set up the World 3D Plot ____________________________________________________________________________
-fig = plt.figure(1)
+fig = plt.figure(1,figsize=(10, 10))
+manager = plt.get_current_fig_manager()
+manager.window.wm_geometry("+100+100") 
+
 ax = fig.add_subplot(111, projection='3d')
 plot_coordinate_system(ax,length=3) # plot wworld coordinate system
 point_world = np.array([5,5,0],dtype=np.float32) # initialize world point
@@ -30,12 +33,16 @@ point_world_plot, = ax.plot([point_world[0]], [point_world[1]], [point_world[2]]
 for i, camera_name in enumerate(all_cameras): # for each camera
         camera_name.Rt2Pose(ax) # plot camera pose
         plot_coordinate_system(ax, origin=camera_name.t, R=camera_name.R.T, length=1) # plot camera coordinate system
-        for j, camera_name2 in enumerate(all_cameras): # for each camera
+        for j, other_camera in enumerate(all_cameras): # for each camera
+                if j == i:
+                        continue  # Skip the iteration if j is equal to i
                 field_name = f"camera{j+1}_epipole" 
-                setattr(camera_name, field_name, camera_name.world2camera(camera_name2.t)) # calculate epipole for each camera
-
+                setattr(camera_name, field_name, camera_name.world2camera(other_camera.t)) # calculate epipole for each other camera
+                
 # Set up the Camera 2D Plot_____________________________________________________________________________
-fig_camviews, axs_camviews = plt.subplots(2, 2)
+fig_camviews, axs_camviews = plt.subplots(2, 2,figsize=(8, 6))
+manager = plt.get_current_fig_manager()
+manager.window.wm_geometry("+1200+100") 
 camviews_plots = []    
 
 for i, axs in enumerate(axs_camviews.flat):
@@ -46,12 +53,14 @@ for i, axs in enumerate(axs_camviews.flat):
         axs.grid()
         axs.title.set_text(f"Camera {i+1}")
         for j, camera_names2 in enumerate(all_cameras):
-                field_name = f"camera{j+1}_epipole"
+                if j == i:
+                        continue  # Skip the iteration if j is equal to i
+                field_name = f"camera{j+1}_epipole" # get epipole for each other camera
                 axs.plot(getattr(all_cameras[i],field_name)[0], getattr(all_cameras[i],field_name)[1], marker='o', markersize=5, color=colors[j])
               
 while 1: #______________________________________________________________________________________________
     if keyboard.is_pressed('esc'):
-        print('esc pressed!')
+        print('Seeyuh!')
         break
     
     # Update the world point position using the space mouse
@@ -65,7 +74,12 @@ while 1: #______________________________________________________________________
     
     # Update the camera frames
     for i, axs in enumerate(axs_camviews.flat):
-         point = all_cameras[i].world2camera(point_world)
-         camviews_plots[i].set_data([point[0]],[point[1]])
+        point = all_cameras[i].world2camera(point_world)
+        camviews_plots[i].set_data([point[0]],[point[1]])
+        for j, camera_names2 in enumerate(all_cameras):
+              if j == i:
+                continue
+              field_name = f"camera{j+1}_epipole" 
+              epipole = getattr(all_cameras[i], field_name)
     plt.pause(.001)
         
