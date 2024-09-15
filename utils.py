@@ -21,7 +21,6 @@ def unit(vector):
 def create_extrinsic_matrix(R=np.eye(3), t = np.array([0,0,0])):
     t = t.reshape(3,1)
     E = np.concatenate((R,t),axis=1)
-    E = np.vstack((E,np.array([0,0,0,1])))
     return E
 
 def plot_coordinate_system(ax,origin=np.array([0,0,0]),R=np.eye(3),length=1):
