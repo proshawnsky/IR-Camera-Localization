@@ -10,7 +10,7 @@ class custom_camera:
         self.focal_len = focal_len
         self.camera_resolution = camera_resolution
         self.E = create_extrinsic_matrix(self.R,self.t).T
-        self.I = np.array([[focal_len, 0, 0, 0], [0, focal_len, 0, 0], [0, 0, 1, 0]], dtype=np.float32)
+        self.I = np.array([[focal_len, 0, 0], [0, focal_len, 0], [0, 0, 1]], dtype=np.float32)
 
     def set_boresight(self, boresight_target):
         self.boresight_target = boresight_target
@@ -24,24 +24,12 @@ class custom_camera:
         
     def world2camera(self, point_world):
         point_camera = self.R.T @ (point_world - self.t).reshape([-1,1])
-        # E = np.hstack((self.R, (self.t).reshape(-1, 1)))
-
-        # point_camera = E @ point_world_aug
-        # print(self.R @ point_world_col)
-        # t_aug = np.hstack((self.t, [1])).reshape(4,1)
-        # # point_camera = self.R @ point_world.reshape(1,3) + self.t.reshape(1,3)
-        # # point_camera = (self.R @ point_world - self.t).reshape(3)
-        # point_camera_aug = self.E @ point_world_aug - t_aug
-        # point_frame = self.I @ point_camera_aug
-        # self.point_frame = point_frame
-        # self.point_camera = point_camera_aug[:2].reshape(2)
         self.point_camera = point_camera
+        self.point_frame = self.I @ point_camera
 
     def Rt2Pose(self, ax):
         pyramid = np.array([[0, 0, 0], [1, 1, -1], [1, -1, -1], [-1, -1, -1], [-1, 1, -1]])
         vertices = (self.R @ pyramid.T).T + self.t
         faces = [[0, 1, 2, 0], [0, 2, 3, 0], [0, 3, 4, 0], [0, 4, 1, 0]]
-
         mesh = Poly3DCollection(vertices[faces], alpha=0.5,facecolors=self.color)
-
         ax.add_collection3d(mesh)
