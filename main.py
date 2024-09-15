@@ -1,5 +1,4 @@
 import numpy as np
-from extrinsic2pyramid.util.camera_pose_visualizer import CameraPoseVisualizer
 import matplotlib.pyplot as plt
 import keyboard
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection

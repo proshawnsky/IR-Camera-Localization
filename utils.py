@@ -24,7 +24,6 @@ def create_extrinsic_matrix(R=np.eye(3), t = np.array([0,0,0])):
     return E
 
 def plot_coordinate_system(ax,origin=np.array([0,0,0]),R=np.eye(3),length=1):
-
     x_end = origin + length * R[:, 0]
     y_end = origin + length * R[:, 1]
     z_end = origin + length * R[:, 2]
