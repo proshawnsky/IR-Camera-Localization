@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import linalg, optimize, signal
 from scipy.linalg import svd
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 def normalize_dcm(dcm):
     # Calculate the inverse of the DCM
@@ -21,8 +22,7 @@ def unit(vector):
     return vector / np.linalg.norm(vector)
 
 def create_extrinsic_matrix(R=np.eye(3), t = np.array([0,0,0])):
-    t = t.reshape(3,1)
-    E  = np.hstack([R, t.reshape(-1, 1)])
+    E = np.concatenate((R.T, -R.T @ t.reshape(-1,1)), axis=1)
     return E
 
 def plot_coordinate_system(ax,origin=np.array([0,0,0]),R=np.eye(3),length=1):
@@ -54,4 +54,52 @@ def triangulate(P_list, x_list):
     return X[:3]  # Return in non-homogeneous coordinates
     
 
-  
+def euler_to_dcm(euler_angles):
+    # Convert Euler angles (roll, pitch, yaw) to DCM
+    r, p, y = euler_angles
+    cr, sr = np.cos(r), np.sin(r)
+    cp, sp = np.cos(p), np.sin(p)
+    cy, sy = np.cos(y), np.sin(y)
+
+    dcm = np.array([
+        [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+        [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+        [-sp, cp * sr, cp * cr]
+    ])
+    return dcm    
+
+def plot_chessboard(ax, room_center, square_size=2.25, board_size=8):
+    """
+    Plots a chessboard on the floor (z = 0) centered at room_center.
+
+    Parameters:
+    - ax: The matplotlib 3D axis to plot on.
+    - room_center: The (x, y) coordinates for the center of the chessboard.
+    - square_size: The size of each square on the chessboard.
+    - board_size: The number of squares along one edge of the chessboard (default is 8 for an 8x8 chessboard).
+    """
+    # Calculate the bottom-left corner of the chessboard
+    start_x = room_center[0] - (board_size / 2) * square_size
+    start_y = room_center[1] - (board_size / 2) * square_size
+
+    # Generate squares for the chessboard
+    for i in range(board_size):
+        for j in range(board_size):
+            x = start_x + i * square_size
+            y = start_y + j * square_size
+            
+            # Define the corners of the square
+            square = np.array([[x, y, 0], 
+                               [x + square_size, y, 0], 
+                               [x + square_size, y + square_size, 0], 
+                               [x, y + square_size, 0]])
+            
+            # Alternate colors between black and white
+            color = 'black' if (i + j) % 2 == 0 else 'white'
+            
+            # Plot the square
+            square_collection = Poly3DCollection([square], color=color)
+            ax.add_collection3d(square_collection)
+
+
+
