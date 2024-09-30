@@ -7,10 +7,13 @@ class custom_real_camera:
     def __init__(self, t = np.array([0,0,0],dtype=np.float32), 
                  R=np.eye(3), 
                  I=np.eye(3), 
-                 camera_resolution=np.array([640,480]), 
+                 camera_resolution=np.array([1280,720]), 
                  color='r', 
                  show_img=False,
-                 pose_depth = 4*12):
+                 pose_depth = 2*12,
+                 image_scale = 1,
+                 cameraID = 1):
+        self.cameraID = cameraID
         self.color = color
         self.R = R # from world to camera 
         self.t = t # from world to camera
@@ -21,13 +24,22 @@ class custom_real_camera:
         self.pose_depth = pose_depth
         self.resolutionX = camera_resolution[0]
         self.resolutionY = camera_resolution[1]
-        
+        self.image_scale = image_scale
+        self.E = create_extrinsic_matrix(self.R, self.t)
+        self.P = self.I @ self.E
         self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolutionX)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolutionY)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        self.cap.set(cv2.CAP_PROP_FPS, 120)
         exposure_value = 10  # Adjust this value (-6 is typically low exposure)
         self.cap.set(cv2.CAP_PROP_EXPOSURE, exposure_value)
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
+        print(f"Initializing Camera {self.cameraID}:")
+        print(f"Actual Resolution: {int(actual_width)} x {int(actual_height)}")
+        print(f"Actual Frame Rate: {actual_fps} FPS")
 
     def set_boresight(self, boresight_target):
         self.boresight_target = boresight_target
@@ -99,21 +111,18 @@ class custom_real_camera:
     def getFrame(self):
         self.bright = np.array([self.resolutionX/2, self.resolutionY/2])
         _, frame = self.cap.read()
+        frame = cv2.resize(frame, (0, 0), fx=self.image_scale, fy=self.image_scale)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the image to get the bright areas
         _, gray = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
-        scaling_factor = 0.5  # 0.5 reduces brightness by 50%, adjust as needed
-        gray = cv2.convertScaleAbs(gray, alpha=scaling_factor, beta=0)
+        # scaling_factor = 0.5  # 0.5 reduces brightness by 50%, adjust as needed
+        # gray = cv2.convertScaleAbs(gray, alpha=scaling_factor, beta=0)
         # Find contours of the thresholded image
         contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         height, width, _ = frame.shape
         # Calculate the center coordinates
-        center_x = width // 2
-        center_y = height // 2
-
-        if self.show_img:
-            cv2.circle(frame, (center_x, center_y), 4, (0, 0, 255), -1)
+        
 
         if contours:
             # Find the largest contour, assuming it's the bright object
@@ -126,9 +135,9 @@ class custom_real_camera:
                 cY = int(M["m01"] / M["m00"])
                 self.bright = np.array([cX, cY])
                 cv2.circle(frame, (cX, cY), 5, (0, 255, 0),thickness=2)
-
-                
         if self.show_img:
-            frame = cv2.resize(frame, (0,0), fx=2.5, fy=2.5)
+            center_x = width // 2
+            center_y = height // 2
+            cv2.circle(frame, (center_x, center_y), 4, (0, 0, 255), -1)
             cv2.imshow('Frame', frame)
         
