@@ -25,17 +25,18 @@ def unit(vector):
 
 def create_extrinsic_matrix(R=np.eye(3), t = np.array([0,0,0])):
     E = np.concatenate((R.T, -R.T @ t.reshape(-1,1)), axis=1)
+    # E = np.concatenate((R, t.reshape(-1, 1)), axis=1)
     return E
 
-def plot_coordinate_system(ax,origin=np.array([0,0,0]),R=np.eye(3),length=1):
+def plot_coordinate_system(ax,origin=np.array([0,0,0]),R=np.eye(3),length=1, linewidth=2):
     x_end = origin + length * R[:, 0]
     y_end = origin + length * R[:, 1]
     z_end = origin + length * R[:, 2]
 
     # Plot the axes
-    ax.quiver(origin[0], origin[1], origin[2], x_end[0] - origin[0], x_end[1] - origin[1], x_end[2] - origin[2], color='r', zorder=10000, linewidth=4)
-    ax.quiver(origin[0], origin[1], origin[2], y_end[0] - origin[0], y_end[1] - origin[1], y_end[2] - origin[2], color='g', zorder=10000, linewidth=4)
-    ax.quiver(origin[0], origin[1], origin[2], z_end[0] - origin[0], z_end[1] - origin[1], z_end[2] - origin[2], color='b', zorder=10000, linewidth=4)
+    ax.quiver(origin[0], origin[1], origin[2], x_end[0] - origin[0], x_end[1] - origin[1], x_end[2] - origin[2], color='r', zorder=10000, linewidth=linewidth)
+    ax.quiver(origin[0], origin[1], origin[2], y_end[0] - origin[0], y_end[1] - origin[1], y_end[2] - origin[2], color='g', zorder=10000, linewidth=linewidth)
+    ax.quiver(origin[0], origin[1], origin[2], z_end[0] - origin[0], z_end[1] - origin[1], z_end[2] - origin[2], color='b', zorder=10000, linewidth=linewidth)
 
 def triangulate(P_list, x_list):
     A = []
@@ -124,10 +125,50 @@ def plot_aruco_grid(ax, room_center = np.array([0,0,0]), marker_size=10.75):
     X, Y = np.meshgrid(x, y)
     Z = np.zeros(X.shape) + room_center[2]
     # Plot the surface with the image as a texture
-    print(marker_rgba.shape)
     ax.plot_surface(X, Y, Z, facecolors=marker_rgba, cmap='viridis', edgecolor='none', antialiased=True)
 
-            
+def closest_approach_between_segments(ray1, ray2):
+    # Extract points from the lines
+    p1, q1 = ray1  # Points on first line
+    p2, q2 = ray2  # Points on second line
+    
+    # Direction vectors of the lines
+    d1 = q1 - p1  # Direction vector of first line
+    d2 = q2 - p2  # Direction vector of second line
+    
+    # Find the vector between one point on each line
+    r = p1 - p2
+    
+    # Coefficients to solve for parametric distances on the lines
+    a = np.dot(d1, d1)
+    b = np.dot(d1, d2)
+    c = np.dot(d2, d2)
+    d = np.dot(d1, r)
+    e = np.dot(d2, r)
+    
+    # Calculate the parameters for the closest points on each line
+    denominator = a * c - b * b
+    if denominator == 0:
+        raise ValueError("Lines are parallel or nearly parallel")
+    
+    # Solving for sc (scalar for first line) and tc (scalar for second line)
+    sc = (b * e - c * d) / denominator
+    tc = (a * e - b * d) / denominator
+    
+    # Closest points on the two lines
+    closest_point_on_ray1 = p1 + sc * d1
+    closest_point_on_ray2 = p2 + tc * d2
+    
+    # Midpoint between the closest points
+    midpoint = (closest_point_on_ray1 + closest_point_on_ray2) / 2.0
+    
+    # Distance (magnitude of the closest approach)
+    closest_approach_distance = np.linalg.norm(closest_point_on_ray1 - closest_point_on_ray2)
+    
+    return midpoint, closest_approach_distance
+
+
+
 
 
 

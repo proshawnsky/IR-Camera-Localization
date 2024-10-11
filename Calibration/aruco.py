@@ -11,23 +11,48 @@ References  :
 import numpy as np
 import cv2
 import cv2.aruco as aruco
+import time
+camSelect = 2
 
-cap = cv2.VideoCapture(0)
+if camSelect == 1:
+    camID = 0
+    data = np.load('camera1_calibration.npz')
+    mtx = data['I']
+    dist = data['dist_coeffs']
+elif camSelect == 2:
+    camID = 1
+    data = np.load('camera1_calibration.npz')
+    mtx = data['I']
+    dist = data['dist_coeffs'] 
+else:
+    print("Enter a valid camera number")
+    exit()
+
+cap = cv2.VideoCapture(camID, cv2.CAP_DSHOW)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 800)
 cap.set(cv2.CAP_PROP_FPS, 120)
-# cap.set(cv2.CAP_PROP_EXPOSURE, 50)
-mtx = np.array([[1.12114535e+03, 0, 6.50227771e+02],
-                           [0, 1.12114535e+03, 3.56113978e+02],
-                           [0, 0, 1]], dtype=np.float32)
+# 10 = bright, -10 = dark, -13 = very dark
+exposure_value = 10  # Adjust this value (-6 is typically low exposure)
+cap.set(cv2.CAP_PROP_EXPOSURE, exposure_value)
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
 
-dist = np.array([[-0.46781635, 0.33714806, 0.00609717, -0.00131893, -0.17436972]], dtype=np.float32)
 
+
+
+
+last_print_time = time.time()
 ###------------------ ARUCO TRACKER ---------------------------
 while (True):
+    current_time = time.time()
     ret, frame = cap.read()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
+    height, width, _ = frame.shape
+        # Calculate the center coordinates
+         
+    center_x = width // 2
+    center_y = height // 2
+    cv2.circle(frame, (center_x, center_y), 4, (0, 0, 255), -1)
     # set dictionary size depending on the aruco marker selected
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_7X7_50)
 
@@ -52,10 +77,20 @@ while (True):
         rotation_matrix_inv = np.transpose(rotation_matrix)
         camera_position_in_marker_frame = -np.dot(rotation_matrix_inv, tvec[0].reshape(3, 1))
 
-        print(f"t = np.array({camera_position_in_marker_frame.reshape(-1).tolist()})")
-
-# Print rotation matrix `R`
-        print(f"R = np.array({rotation_matrix.tolist()})")
+        if current_time - last_print_time >= 2:
+            print(f"t = np.array({camera_position_in_marker_frame.reshape(-1).tolist()})")
+            print(f"R = np.array({rotation_matrix.tolist()}).T")
+            print()
+            last_print_time = current_time
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord(' '):
+            # Overwrite R and t in the npz file
+            if camSelect == 1:
+                np.savez('camera1_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame)
+                print("Wrote camera 1 R and t in file.")
+            elif camSelect == 2:
+                np.savez('camera2_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame)
+                print("Wrote camera 2 R and t in file.")
 
         for i in range(0, ids.size):
             # draw axis for the aruco markers
@@ -63,8 +98,8 @@ while (True):
 
         # draw a square around the markers
         aruco.drawDetectedMarkers(frame, corners)
-    frame = cv2.resize(frame, None, fx=1.8, fy=1.8, interpolation=cv2.INTER_LINEAR)
-
+    
+   
     cv2.imshow('frame',frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break

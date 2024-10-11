@@ -7,31 +7,36 @@ class custom_real_camera:
     def __init__(self, t = np.array([0,0,0],dtype=np.float32), 
                  R=np.eye(3), 
                  I=np.eye(3), 
-                 camera_resolution=np.array([1280,720]), 
+                 camera_resolution=np.array([1280,800]), 
                  color='r', 
                  show_img=False,
                  pose_depth = 2*12,
                  image_scale = 1,
-                 cameraID = 1):
+                 cameraID = 1,
+                 vidCapID = 0,
+                 undistort=False,
+                 distortion_coefficients = np.array([0.0, 0.0, 0.0, 0.0, 0.0])):
         self.cameraID = cameraID
         self.color = color
         self.R = R # from world to camera 
         self.t = t # from world to camera
         self.E = create_extrinsic_matrix(self.R,self.t)
         self.I = I
-        self.P = self.I @ self.E
+        self.I_prime = I
+        self.undistort = undistort
+        self.distortion_coefficients = distortion_coefficients
         self.show_img = show_img
         self.pose_depth = pose_depth
         self.resolutionX = camera_resolution[0]
         self.resolutionY = camera_resolution[1]
         self.image_scale = image_scale
-        self.E = create_extrinsic_matrix(self.R, self.t)
+        self.E = create_extrinsic_matrix(self.R.T, self.t)
         self.P = self.I @ self.E
-        self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        self.cap = cv2.VideoCapture(vidCapID, cv2.CAP_DSHOW)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolutionX)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolutionY)
         self.cap.set(cv2.CAP_PROP_FPS, 120)
-        exposure_value = 10  # Adjust this value (-6 is typically low exposure)
+        exposure_value = 8  # Adjust this value (-6 is typically low exposure) -8 us good
         self.cap.set(cv2.CAP_PROP_EXPOSURE, exposure_value)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -67,10 +72,16 @@ class custom_real_camera:
         d = self.pose_depth
         u = self.bright[0]
         v = self.bright[1]
-        f_x = self.I[0, 0]  # Focal length in x direction
-        f_y = self.I[1, 1]  # Focal length in y direction
-        c_x = self.I[0, 2]  # Principal point x-coordinate
-        c_y = self.I[1, 2]  # Principal point y-coordinate
+        # f_x = self.I[0, 0]  # Focal length in x direction
+        # f_y = self.I[1, 1]  # Focal length in y direction
+        # c_x = self.I[0, 2]  # Principal point x-coordinate
+        # c_y = self.I[1, 2]  # Principal point y-coordinate
+    
+    # Extract new focal lengths and principal point from the new matrix
+        f_x = self.I_prime[0, 0]  # Focal length in x direction (undistorted)
+        f_y = self.I_prime[1, 1]  # Focal length in y direction (undistorted)
+        c_x = self.I_prime[0, 2]  # Principal point x-coordinate (undistorted)
+        c_y = self.I_prime[1, 2]  # Principal point y-coordinate (undistorted)
         # Convert pixel coordinates to normalized image coordinates
         x_norm = (u - c_x) / f_x
         y_norm = (v - c_y) / f_y
@@ -80,8 +91,8 @@ class custom_real_camera:
         
     
     def Rt2Pose(self, ax, d=1, alpha=.5):
-        f_x = self.I[0, 0]  # Focal length in x direction (mm)
-        f_y = self.I[1, 1]  # Focal length in y direction (mm)
+        f_x = self.I_prime[0, 0]  # Focal length in x direction (mm)
+        f_y = self.I_prime[1, 1]  # Focal length in y direction (mm)
 
         # Sensor size in pixels (can be adjusted)
         sensor_width = self.resolutionX   # Image width in pixels
@@ -111,7 +122,15 @@ class custom_real_camera:
     def getFrame(self):
         self.bright = np.array([self.resolutionX/2, self.resolutionY/2])
         _, frame = self.cap.read()
-        frame = cv2.resize(frame, (0, 0), fx=self.image_scale, fy=self.image_scale)
+        height, width, _ = frame.shape
+        if self.undistort:
+            alpha = .8
+            new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.I, self.distortion_coefficients, (width, height), alpha=alpha)
+            frame = cv2.undistort(frame, self.I, self.distortion_coefficients, None, new_camera_matrix)
+            self.I_prime = new_camera_matrix
+        # self.I_prime = new_camera_mtx
+        # self.I = new_camera_mtx
+
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the image to get the bright areas
@@ -120,7 +139,7 @@ class custom_real_camera:
         # gray = cv2.convertScaleAbs(gray, alpha=scaling_factor, beta=0)
         # Find contours of the thresholded image
         contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        height, width, _ = frame.shape
+        
         # Calculate the center coordinates
         
 
@@ -134,10 +153,10 @@ class custom_real_camera:
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
                 self.bright = np.array([cX, cY])
-                cv2.circle(frame, (cX, cY), 5, (0, 255, 0),thickness=2)
+                cv2.circle(frame, (cX, cY), 5, (0, 255, 0),thickness=3)
         if self.show_img:
             center_x = width // 2
             center_y = height // 2
             cv2.circle(frame, (center_x, center_y), 4, (0, 0, 255), -1)
-            cv2.imshow('Frame', frame)
-        
+            cv2.imshow(self.color, frame)
+        return frame
