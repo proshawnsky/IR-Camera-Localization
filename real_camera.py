@@ -36,7 +36,7 @@ class custom_real_camera:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolutionX)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolutionY)
         self.cap.set(cv2.CAP_PROP_FPS, 120)
-        exposure_value = 8  # Adjust this value (-6 is typically low exposure) -8 us good
+        exposure_value = 10  # Adjust this value (-6 is typically low exposure) -8 us good
         self.cap.set(cv2.CAP_PROP_EXPOSURE, exposure_value)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -134,7 +134,7 @@ class custom_real_camera:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the image to get the bright areas
-        _, gray = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
+        _, gray = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY)
         # scaling_factor = 0.5  # 0.5 reduces brightness by 50%, adjust as needed
         # gray = cv2.convertScaleAbs(gray, alpha=scaling_factor, beta=0)
         # Find contours of the thresholded image

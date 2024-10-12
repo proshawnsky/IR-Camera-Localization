@@ -9,9 +9,9 @@ from utils import *
 import csv
 
 # Options
-show_3D_plot = False
+show_3D_plot = True
 show_frames = True
-print_calculations = False
+print_calculations = True  
 
 # Define Cameras ___________________________________________________________________________________
 cam1_intrinsics = np.load('camera1_calibration.npz')
@@ -154,7 +154,8 @@ while 1: #______________________________________________________________________
     # Record the midpoint and error if recording is active
     if recording:
         elapsed_time = time.time() - start_time
-        recorded_data.append([elapsed_time, midpoint[0], midpoint[1], midpoint[2], distance])
-        if print_calculations:
-            print(f"Time: {elapsed_time:.2f} s, Midpoint: {midpoint:.2f}, Error: {distance:.2f}")
+        if distance <= 4:  # Threshold to consider a successful approach
+            recorded_data.append([elapsed_time, midpoint[0], midpoint[1], midpoint[2], distance])
+            if print_calculations:
+                print(f"Time: {elapsed_time:.2f} s, Midpoint: {midpoint}, Error: {distance}")
  
