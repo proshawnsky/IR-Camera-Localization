@@ -69,25 +69,37 @@ class custom_real_camera:
         return point_frame[:2]/point_frame[2]
 
     def camera2world(self):
+        if not hasattr(self, 'bright_points') or len(self.bright_points) == 0:
+            return []
+        
         d = self.pose_depth
-        u = self.bright[0]
-        v = self.bright[1]
-        # f_x = self.I[0, 0]  # Focal length in x direction
-        # f_y = self.I[1, 1]  # Focal length in y direction
-        # c_x = self.I[0, 2]  # Principal point x-coordinate
-        # c_y = self.I[1, 2]  # Principal point y-coordinate
+        f_x = self.I[0, 0]  # Focal length in x direction
+        f_y = self.I[1, 1]  # Focal length in y direction
+        c_x = self.I[0, 2]  # Principal point x-coordinate
+        c_y = self.I[1, 2]  # Principal point y-coordinate
     
     # Extract new focal lengths and principal point from the new matrix
-        f_x = self.I_prime[0, 0]  # Focal length in x direction (undistorted)
-        f_y = self.I_prime[1, 1]  # Focal length in y direction (undistorted)
-        c_x = self.I_prime[0, 2]  # Principal point x-coordinate (undistorted)
-        c_y = self.I_prime[1, 2]  # Principal point y-coordinate (undistorted)
+        # f_x = self.I_prime[0, 0]  # Focal length in x direction (undistorted)
+        # f_y = self.I_prime[1, 1]  # Focal length in y direction (undistorted)
+        # c_x = self.I_prime[0, 2]  # Principal point x-coordinate (undistorted)
+        # c_y = self.I_prime[1, 2]  # Principal point y-coordinate (undistorted)
         # Convert pixel coordinates to normalized image coordinates
-        x_norm = (u - c_x) / f_x
-        y_norm = (v - c_y) / f_y
-        point_on_base = np.array([x_norm * d, y_norm * d, d])
-        point_on_base = (self.R @ point_on_base.T) + self.t
-        return point_on_base
+        world_points = []
+    
+    # Loop over each bright point
+        for point in self.bright_points:
+            u, v = point  # Extract u and v from each bright point
+            
+            # Convert pixel coordinates to normalized image coordinates
+            x_norm = (u - c_x) / f_x
+            y_norm = (v - c_y) / f_y
+            point_on_base = np.array([x_norm * d, y_norm * d, d])
+            
+            # Apply rotation and translation to transform to world coordinates
+            point_in_world = (self.R @ point_on_base.T) + self.t
+            world_points.append(point_in_world)
+    
+        return np.array(world_points)
         
     
     def Rt2Pose(self, ax, d=1, alpha=.5):
@@ -120,7 +132,7 @@ class custom_real_camera:
         pose.set_clip_on(True)
         
     def getFrame(self):
-        self.bright = np.array([self.resolutionX/2, self.resolutionY/2])
+
         _, frame = self.cap.read()
         height, width, _ = frame.shape
         if self.undistort:
@@ -133,7 +145,7 @@ class custom_real_camera:
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Threshold the image to get the bright areas
+        # Threshold the image to get the brite areas
         _, gray = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY)
         # scaling_factor = 0.5  # 0.5 reduces brightness by 50%, adjust as needed
         # gray = cv2.convertScaleAbs(gray, alpha=scaling_factor, beta=0)
@@ -142,18 +154,16 @@ class custom_real_camera:
         
         # Calculate the center coordinates
         
-
-        if contours:
-            # Find the largest contour, assuming it's the bright object
-            largest_contour = max(contours, key=cv2.contourArea)
-            
-            # Calculate the centroid of the largest contour
-            M = cv2.moments(largest_contour)
-            if M["m00"] != 0:
+        centroids = []
+        for contour in contours:
+            M = cv2.moments(contour)
+            if M["m00"] != 0:  # Check to avoid division by zero
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
-                self.bright = np.array([cX, cY])
+                centroids.append([cX, cY])
                 cv2.circle(frame, (cX, cY), 5, (0, 255, 0),thickness=3)
+        self.bright_points = np.array(centroids)
+
         if self.show_img:
             center_x = width // 2
             center_y = height // 2

@@ -12,18 +12,20 @@ import numpy as np
 import cv2
 import cv2.aruco as aruco
 import time
-camSelect = 2
+camSelect = 1
 
 if camSelect == 1:
     camID = 0
     data = np.load('camera1_calibration.npz')
     mtx = data['I']
     dist = data['dist_coeffs']
+    print('Loaded Camera 1')
 elif camSelect == 2:
     camID = 1
-    data = np.load('camera1_calibration.npz')
+    data = np.load('camera2_calibration.npz')
     mtx = data['I']
     dist = data['dist_coeffs'] 
+    print('Loaded Camera 2')
 else:
     print("Enter a valid camera number")
     exit()
@@ -45,14 +47,23 @@ last_print_time = time.time()
 ###------------------ ARUCO TRACKER ---------------------------
 while (True):
     current_time = time.time()
-    ret, frame = cap.read()
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    height, width, _ = frame.shape
-        # Calculate the center coordinates
-         
-    center_x = width // 2
-    center_y = height // 2
-    cv2.circle(frame, (center_x, center_y), 4, (0, 0, 255), -1)
+    ret, frame_orig = cap.read()
+    
+    h, w = frame_orig.shape[:2]
+    alpha = .2
+    new_mtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), alpha, (w, h))
+
+    # Undistort the frame
+    frame_undistorted = cv2.undistort(frame_orig, mtx, dist, None, new_mtx)
+
+    gray = cv2.cvtColor(frame_undistorted, cv2.COLOR_BGR2GRAY)
+
+    # height, width, _ = frame.shape
+    #     # Calculate the center coordinate
+
+    # center_x = width // 2
+    # center_y = height // 2
+    # cv2.circle(frame, (center_x, center_y), 4, (0, 0, 255), -1)
     # set dictionary size depending on the aruco marker selected
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_7X7_50)
 
@@ -72,7 +83,8 @@ while (True):
 
         # estimate pose of each marker and return the valueqqs
         # rvet and tvec-different from camera coefficients
-        rvec, tvec ,_ = aruco.estimatePoseSingleMarkers(corners, 10.75, mtx, dist)
+
+        rvec, tvec ,_ = aruco.estimatePoseSingleMarkers(corners, 10.787, new_mtx, distCoeffs=None)
         rotation_matrix, _ = cv2.Rodrigues(rvec[0])
         rotation_matrix_inv = np.transpose(rotation_matrix)
         camera_position_in_marker_frame = -np.dot(rotation_matrix_inv, tvec[0].reshape(3, 1))
@@ -86,21 +98,23 @@ while (True):
         if key == ord(' '):
             # Overwrite R and t in the npz file
             if camSelect == 1:
-                np.savez('camera1_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame)
+                np.savez('camera1_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame, I = new_mtx)
                 print("Wrote camera 1 R and t in file.")
             elif camSelect == 2:
-                np.savez('camera2_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame)
+                np.savez('camera2_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame, I = new_mtx)
                 print("Wrote camera 2 R and t in file.")
 
         for i in range(0, ids.size):
             # draw axis for the aruco markers
-            cv2.drawFrameAxes(frame, mtx, dist, rvec[i], tvec[i], 12)
+            cv2.drawFrameAxes(frame_undistorted, new_mtx, None, rvec[i], tvec[i], 10.787/2, )
 
         # draw a square around the markers
-        aruco.drawDetectedMarkers(frame, corners)
+        aruco.drawDetectedMarkers(frame_undistorted, corners)
     
-   
-    cv2.imshow('frame',frame)
+    # combined = np.hstack((frame_orig, frame_undistorted))
+    
+    # cv2.imshow('Original vs Undistorted', combined)
+    cv2.imshow('frame',frame_undistorted)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
