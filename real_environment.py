@@ -15,27 +15,27 @@ print_calculations = True
 
 # Define Cameras ___________________________________________________________________________________
 cam1_intrinsics = np.load('camera1_calibration.npz')
-# I1 = cam1_intrinsics['I']
+I1 = cam1_intrinsics['I']
 dist_coeffs1 = cam1_intrinsics['dist_coeffs']
 cam1_extrinsics = np.load('camera1_extrinsics.npz')
 R1 = cam1_extrinsics['R'].T
 t1 = cam1_extrinsics['t'].reshape(-1)
-I1 = cam1_extrinsics['I'] # AFTER UNDISTORTION
+Inew1 = cam1_extrinsics['I'] # AFTER UNDISTORTION
 camera1 = custom_real_camera(R = R1,
                         t = t1,
-                       color='r',show_img=False, image_scale=1, I = I1, pose_depth=12, vidCapID=0,
+                       color='r',show_img=False, image_scale=1, I = I1, Inew = Inew1, pose_depth=12, vidCapID=0,
                        distortion_coefficients = dist_coeffs1, undistort=False, cameraID=1)
 
 cam2_intrinsics = np.load('camera2_calibration.npz')
-# I2 = cam2_intrinsics['I']
+I2 = cam2_intrinsics['I']
 dist_coeffs2 = cam2_intrinsics['dist_coeffs']
 cam2_extrinsics = np.load('camera2_extrinsics.npz')
 R2 = cam2_extrinsics['R'].T # marker position in camera frame
 t2 = cam2_extrinsics['t'].reshape(-1)
-I2 = cam2_extrinsics['I'] # AFTER UNDISTORTION
+Inew2 = cam2_extrinsics['I'] # AFTER UNDISTORTION
 camera2 = custom_real_camera(R = R2,
                         t = t2,
-                       color='b',show_img=False, image_scale=1, I = I2, pose_depth=12, vidCapID=1,
+                       color='b',show_img=False, image_scale=1, I = I2, Inew = Inew2, pose_depth=12, vidCapID=1,
                        distortion_coefficients = dist_coeffs2, undistort=False, cameraID=2)
 all_cameras = [camera1, camera2]
 

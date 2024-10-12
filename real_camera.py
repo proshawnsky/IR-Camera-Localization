@@ -15,20 +15,23 @@ class custom_real_camera:
                  cameraID = 1,
                  vidCapID = 0,
                  undistort=False,
-                 distortion_coefficients = np.array([0.0, 0.0, 0.0, 0.0, 0.0])):
+                 distortion_coefficients = np.array([0.0, 0.0, 0.0, 0.0, 0.0]),
+                 Inew = np.eye(3)):
         self.cameraID = cameraID
         self.color = color
         self.R = R # from world to camera 
         self.t = t # from world to camera
         self.E = create_extrinsic_matrix(self.R,self.t)
         self.I = I
-        self.I_prime = I
         self.undistort = undistort
         self.distortion_coefficients = distortion_coefficients
         self.show_img = show_img
         self.pose_depth = pose_depth
         self.resolutionX = camera_resolution[0]
         self.resolutionY = camera_resolution[1]
+        self.Inew = Inew
+        self.map1, self.map2 = cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (self.resolutionX, self.resolutionY), 5)
+
         self.image_scale = image_scale
         self.E = create_extrinsic_matrix(self.R.T, self.t)
         self.P = self.I @ self.E
