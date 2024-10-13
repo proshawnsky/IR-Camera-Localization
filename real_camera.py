@@ -141,7 +141,7 @@ class custom_real_camera:
         undistorted_gray = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the image to get the brite areas
-        _, undistorted_gray = cv2.threshold(undistorted_gray, 160, 255, cv2.THRESH_BINARY)
+        _, undistorted_gray = cv2.threshold(undistorted_gray, 140, 255, cv2.THRESH_BINARY)
         # scaling_factor = 0.5  # 0.5 reduces brightness by 50%, adjust as needed
         # gray = cv2.convertScaleAbs(gray, alpha=scaling_factor, beta=0)
         # Find contours of the thresholded image

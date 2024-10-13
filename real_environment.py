@@ -10,7 +10,7 @@ import csv
 
 # Options    b
 show_3D_plot = False
-show_frames = False  
+show_frames = False    
 print_calculations = True  
 reprojection_error_threshold = 2
 
@@ -44,8 +44,6 @@ camera2 = custom_real_camera(R = R2,
 all_cameras = [camera1, camera2]
 
 # Set up the Wqorld 3D Plot ____________________________________________________________________________
-room_center = np.array([0, 0, 0],dtype=np.float32)
-
 if show_3D_plot:
     fig = plt.figure(1,figsize=(20, 12))
     manager = plt.get_current_fig_manager()
@@ -55,7 +53,7 @@ if show_3D_plot:
     plot_aruco_grid(ax)
     plot_coordinate_system(ax,length=6) # plot wworld coordinate system
 
-    ax.grid(False)
+    ax.grid(True)
     ax.xaxis.pane.fill = False
     ax.yaxis.pane.fill = False
     ax.zaxis.pane.fill = False
@@ -67,11 +65,11 @@ if show_3D_plot:
             camera_name.camera2world()
             camera_name.Rt2Pose(ax) # plot camera pose
             plot_coordinate_system(ax, origin=camera_name.t, R=camera_name.R, length=6) # plot camera coordinate system
-            for j, other_camera in enumerate(all_cameras): # for each camera
-                    if j == i:
-                            continue  # Skip the iteration if j is equal to i
-                    field_name = f"camera{j+1}_epipole" 
-                    setattr(camera_name, field_name, camera_name.world2camera(other_camera.t)) # calculate epipole for each other camera
+            # for j, other_camera in enumerate(all_cameras): # for each camera, generate the epipole for each other camera
+            #         if j == i:
+            #                 continue  # Skip the iteration if j is equal to i
+            #         field_name = f"camera{j+1}_epipole" 
+            #         setattr(camera_name, field_name, camera_name.world2camera(other_camera.t)) # calculate epipole for each other camera
 
 # set up recording
 recording = False
@@ -121,9 +119,11 @@ while 1: #______________________________________________________________________
     closest_approaches = []  # List to hold tuples of (midpoint, closest_approach_distance)
     for idx1, ray1 in enumerate(rays1):
         for idx2, ray2 in enumerate(rays2):
-            midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2)
-            if closest_approach_distance < reprojection_error_threshold:
-                candidate_points.append((midpoint, closest_approach_distance))
+            midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2) # find where the rays almost intersect
+            if closest_approach_distance < reprojection_error_threshold: # if the two rays form a close enough point...
+                candidate_points.append((midpoint, closest_approach_distance)) # add to the list of resolved 3D points
+                if print_calculations:
+                    print(f"Candidate from Ray {idx1} and Ray {idx2}: Midpoint {midpoint}, Reprojection Error {closest_approach_distance}")
                 if show_3D_plot:
                     candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
                     candidate_point_plots.append(candidate_point_plot)
@@ -131,9 +131,6 @@ while 1: #______________________________________________________________________
     # Sort the candidates list by the second element (closest_approach_distance)
     candidate_points.sort(key=lambda x: x[1])  # Sort by distance
   
-    for idx, (midpoint, distance) in enumerate(candidate_points):
-        print(f"Sorted Candidate {idx}: Midpoint {midpoint}, Distance {distance}")
-
     if show_3D_plot:
         ax.axis('equal')
         ax.set(xlim=(-50, 50), ylim=(-50, 50), zlim=(0, 96))
@@ -149,19 +146,16 @@ while 1: #______________________________________________________________________
     if show_frames:
         scale = .8
         frame1 = cv2.resize(frame1, (0, 0), fx=scale, fy=scale)
+        
+        # Resize frame2 to have the same width as frame1 while maintaining its aspect ratio
         height1, width1 = frame1.shape[:2]
         height2, width2 = frame2.shape[:2]  
-
-        # Calculate the scaling factor for frame2 to match the width of frame1
         scale_factor = width1 / width2
-
-        # Resize frame2 to have the same width as frame1 while maintaining its aspect ratio
         frame2_resized = cv2.resize(frame2, (width1, int(height2 * scale_factor)))
+        
         combined = np.vstack((frame1, frame2_resized))
         cv2.imshow('frames', combined)
         
-    # midpoint, distance = closest_approach_between_segments(ray[0], ray_line2)
-
     key = cv2.waitKey(1)    
     if keyboard.is_pressed('space') or key == 32:  # Space bar
         time.sleep(.3) 
@@ -182,6 +176,7 @@ while 1: #______________________________________________________________________
         elapsed_time = time.time() - start_time
         if len(candidate_points) > 0:  # Threshold to consider a successful approach
             midpoint = candidate_points[0][0]
+            distance = candidate_points[0][1]
             recorded_data.append([elapsed_time, midpoint[0], midpoint[1], midpoint[2], distance])
               
  
