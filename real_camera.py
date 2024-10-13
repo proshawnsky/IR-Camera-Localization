@@ -32,7 +32,8 @@ class custom_real_camera:
         self.resolutionY = camera_resolution[1]
         self.Inew = Inew
         self.roi = roi
-        self.map1, self.map2 = cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (self.resolutionX, self.resolutionY), 5)
+        # map1, map2 =           cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (frame.shape[1], frame.shape[0]), cv2.CV_16SC2)
+        self.map1, self.map2 = cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (self.roi[2], self.roi[3]),  cv2.CV_16SC2)
 
         self.image_scale = image_scale
         self.E = create_extrinsic_matrix(self.R.T, self.t)
@@ -134,12 +135,9 @@ class custom_real_camera:
     def getFrame(self):
 
         _, frame = self.cap.read()
-        height, width, _ = frame.shape
-        
-        # undistorted_frame = cv2.remap(frame, self.map1, self.map2, cv2.INTER_LINEAR)
-        # x, y, w, h = self.roi
-        undistorted_frame = cv2.undistort(frame, self.I, self.distortion_coefficients, None, self.Inew)
-        # undistorted_frame = undistorted_frame[y:y+h, x:x+w]
+        # height, width, _ = frame.shape
+
+        undistorted_frame = cv2.remap(frame, self.map1, self.map2, interpolation=cv2.INTER_LINEAR)   
         undistorted_gray = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the image to get the brite areas
@@ -161,9 +159,9 @@ class custom_real_camera:
                 cv2.circle(undistorted_frame, (cX, cY), 5, (0, 255, 0),thickness=4)
         self.bright_points = np.array(centroids)
 
-        if self.show_img:
-            center_x = width // 2
-            center_y = height // 2
-            cv2.circle(undistorted_frame, (center_x, center_y), 4, (0, 0, 255), -1)
+        # if self.show_img:
+        #     center_x = width // 2
+        #     center_y = height // 2
+        #     cv2.circle(undistorted_frame, (center_x, center_y), 4, (0, 0, 255), -1)
             # cv2.imshow(self.color, undistorted_frame)
         return undistorted_frame

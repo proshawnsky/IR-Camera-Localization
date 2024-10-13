@@ -8,10 +8,11 @@ from real_camera import custom_real_camera
 from utils import *
 import csv
 
-# Options
+# Options    b
 show_3D_plot = False
 show_frames = False  
 print_calculations = True  
+reprojection_error_threshold = 2
 
 # Define Cameras ___________________________________________________________________________________
 cam1_intrinsics = np.load('camera1_calibration.npz')
@@ -40,10 +41,7 @@ camera2 = custom_real_camera(R = R2,
                        color='b',show_img=True, image_scale=1, I = I2, Inew = Inew2, pose_depth=12, vidCapID=1,
                        distortion_coefficients = dist_coeffs2, undistort=False, cameraID=2, roi = roi2)
 
-
-
 all_cameras = [camera1, camera2]
-
 
 # Set up the Wqorld 3D Plot ____________________________________________________________________________
 room_center = np.array([0, 0, 0],dtype=np.float32)
@@ -51,7 +49,7 @@ room_center = np.array([0, 0, 0],dtype=np.float32)
 if show_3D_plot:
     fig = plt.figure(1,figsize=(20, 12))
     manager = plt.get_current_fig_manager()
-    manager.window.wm_geometry("+0+0") 
+    # manager.window.wm_geometry("+0+0") 
 
     ax = fig.add_subplot(111, projection='3d')
     plot_aruco_grid(ax)
@@ -63,7 +61,6 @@ if show_3D_plot:
     ax.zaxis.pane.fill = False
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)  # Adjust the margins to remove whitespace
     ax.set_box_aspect([1, 1, 1])
-
 
     for i, camera_name in enumerate(all_cameras): # for each camera
             camera_name.getFrame()
@@ -125,25 +122,18 @@ while 1: #______________________________________________________________________
     for idx1, ray1 in enumerate(rays1):
         for idx2, ray2 in enumerate(rays2):
             midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2)
-            if closest_approach_distance < 2:
-                closest_approaches.append((midpoint, closest_approach_distance))
-                
-                # candidate_points.append(midpoint)
-                # candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
-                # candidate_point_plots.append(candidate_point_plot)
-                # print(f"Closest approach distance for ray1 {idx1} and ray2 {idx2}: {closest_approach_distance}")
-    # Sort the closest_approaches list by the second element (closest_approach_distance)
-    closest_approaches.sort(key=lambda x: x[1])  # Sort by distance
-    for midpoint, distance in closest_approaches:
-        candidate_points.append(midpoint)
-        if show_3D_plot:
-            candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
-            candidate_point_plots.append(candidate_point_plot)
-    # for idx, (midpoint, distance) in enumerate(closest_approaches):
-        # print(f"Sorted Candidate {idx}: Midpoint {midpoint}, Distance {distance}")
-    # if len(closest_approaches) > 0:
-    #     best_point = closest_approaches[0][0]
-    #     print(f"Best Point: {best_point}")
+            if closest_approach_distance < reprojection_error_threshold:
+                candidate_points.append((midpoint, closest_approach_distance))
+                if show_3D_plot:
+                    candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
+                    candidate_point_plots.append(candidate_point_plot)
+
+    # Sort the candidates list by the second element (closest_approach_distance)
+    candidate_points.sort(key=lambda x: x[1])  # Sort by distance
+  
+    for idx, (midpoint, distance) in enumerate(candidate_points):
+        print(f"Sorted Candidate {idx}: Midpoint {midpoint}, Distance {distance}")
+
     if show_3D_plot:
         ax.axis('equal')
         ax.set(xlim=(-50, 50), ylim=(-50, 50), zlim=(0, 96))
@@ -160,7 +150,7 @@ while 1: #______________________________________________________________________
         scale = .8
         frame1 = cv2.resize(frame1, (0, 0), fx=scale, fy=scale)
         height1, width1 = frame1.shape[:2]
-        height2, width2 = frame2.shape[:2]
+        height2, width2 = frame2.shape[:2]  
 
         # Calculate the scaling factor for frame2 to match the width of frame1
         scale_factor = width1 / width2
@@ -169,7 +159,6 @@ while 1: #______________________________________________________________________
         frame2_resized = cv2.resize(frame2, (width1, int(height2 * scale_factor)))
         combined = np.vstack((frame1, frame2_resized))
         cv2.imshow('frames', combined)
-
         
     # midpoint, distance = closest_approach_between_segments(ray[0], ray_line2)
 
@@ -191,9 +180,8 @@ while 1: #______________________________________________________________________
     # Record the midpoint and error if recording is active
     if recording:
         elapsed_time = time.time() - start_time
-        if len(closest_approaches) > 0:  # Threshold to consider a successful approach
-            midpoint = closest_approaches[0][0]
+        if len(candidate_points) > 0:  # Threshold to consider a successful approach
+            midpoint = candidate_points[0][0]
             recorded_data.append([elapsed_time, midpoint[0], midpoint[1], midpoint[2], distance])
-            if print_calculations:
-                print(f"Time: {elapsed_time:.2f} s, Midpoint: {midpoint}, Error: {distance}")
+              
  
