@@ -21,10 +21,11 @@ cam1_extrinsics = np.load('camera1_extrinsics.npz')
 R1 = cam1_extrinsics['R'].T
 t1 = cam1_extrinsics['t'].reshape(-1)
 Inew1 = cam1_extrinsics['I'] # AFTER UNDISTORTION
+roi1 = cam1_extrinsics['roi']
 camera1 = custom_real_camera(R = R1,
                         t = t1,
-                       color='r',show_img=False, image_scale=1, I = I1, Inew = Inew1, pose_depth=12, vidCapID=0,
-                       distortion_coefficients = dist_coeffs1, undistort=False, cameraID=1)
+                       color='r',show_img=True, image_scale=1, I = I1, Inew = Inew1, pose_depth=12, vidCapID=0,
+                       distortion_coefficients = dist_coeffs1, undistort=False, cameraID=1, roi = roi1)
 
 cam2_intrinsics = np.load('camera2_calibration.npz')
 I2 = cam2_intrinsics['I']
@@ -33,11 +34,16 @@ cam2_extrinsics = np.load('camera2_extrinsics.npz')
 R2 = cam2_extrinsics['R'].T # marker position in camera frame
 t2 = cam2_extrinsics['t'].reshape(-1)
 Inew2 = cam2_extrinsics['I'] # AFTER UNDISTORTION
+roi2 = cam2_extrinsics['roi']
 camera2 = custom_real_camera(R = R2,
                         t = t2,
-                       color='b',show_img=False, image_scale=1, I = I2, Inew = Inew2, pose_depth=12, vidCapID=1,
-                       distortion_coefficients = dist_coeffs2, undistort=False, cameraID=2)
+                       color='b',show_img=True, image_scale=1, I = I2, Inew = Inew2, pose_depth=12, vidCapID=1,
+                       distortion_coefficients = dist_coeffs2, undistort=False, cameraID=2, roi = roi2)
+
+
+
 all_cameras = [camera1, camera2]
+
 
 # Set up the Wqorld 3D Plot ____________________________________________________________________________
 room_center = np.array([0, 0, 0],dtype=np.float32)
@@ -93,18 +99,18 @@ while 1: #______________________________________________________________________
         for idx, point in enumerate(points1):
             direction = point - camera1.t
             lam = -camera1.t[2] / direction[2] # calculate intersection with z=0 plane
-            ground_intersection = camera1.t + lam*direction*1.1
+            ground_intersection = camera1.t + lam*direction
             ray = np.array([camera1.t, ground_intersection])
             rays1.append(ray)
             ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
             ray_plots.append(ray_plot)
-    ax.axis('equal')
+    
     
     if len(points2) > 0:
         for idx, point in enumerate(points2):
             direction = point - camera2.t
             lam = -camera2.t[2] / direction[2] # calculate intersection with z=0 plane
-            ground_intersection = camera2.t + lam*direction*1.1
+            ground_intersection = camera2.t + lam*direction
             ray = np.array([camera2.t, ground_intersection])
             rays2.append(ray)
             ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
@@ -116,7 +122,7 @@ while 1: #______________________________________________________________________
     for idx1, ray1 in enumerate(rays1):
         for idx2, ray2 in enumerate(rays2):
             midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2)
-            if closest_approach_distance < 20:
+            if closest_approach_distance < 2:
                 closest_approaches.append((midpoint, closest_approach_distance))
                 
                 # candidate_points.append(midpoint)
@@ -133,7 +139,9 @@ while 1: #______________________________________________________________________
         print(f"Sorted Candidate {idx}: Midpoint {midpoint}, Distance {distance}")
 
     ax.axis('equal')
-    plt.pause(.1)
+    ax.set(xlim=(-50, 50), ylim=(-50, 50), zlim=(0, 96))
+    plt.pause(.001)
+    
 
     if len(ray_plots) > 0:
         for ray_plot in ray_plots:
@@ -145,8 +153,15 @@ while 1: #______________________________________________________________________
     if show_frames:
         scale = .8
         frame1 = cv2.resize(frame1, (0, 0), fx=scale, fy=scale)
-        frame2 = cv2.resize(frame2, (0, 0), fx=scale, fy=scale)
-        combined = np.vstack((frame1, frame2))
+        height1, width1 = frame1.shape[:2]
+        height2, width2 = frame2.shape[:2]
+
+        # Calculate the scaling factor for frame2 to match the width of frame1
+        scale_factor = width1 / width2
+
+        # Resize frame2 to have the same width as frame1 while maintaining its aspect ratio
+        frame2_resized = cv2.resize(frame2, (width1, int(height2 * scale_factor)))
+        combined = np.vstack((frame1, frame2_resized))
         cv2.imshow('frames', combined)
 
         

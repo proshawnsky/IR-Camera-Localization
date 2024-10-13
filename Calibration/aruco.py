@@ -50,9 +50,8 @@ while (True):
     ret, frame_orig = cap.read()
     
     h, w = frame_orig.shape[:2]
-    alpha = .2
+    alpha = .3
     new_mtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), alpha, (w, h))
-
     # Undistort the frame
     frame_undistorted = cv2.undistort(frame_orig, mtx, dist, None, new_mtx)
 
@@ -98,10 +97,10 @@ while (True):
         if key == ord(' '):
             # Overwrite R and t in the npz file
             if camSelect == 1:
-                np.savez('camera1_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame, I = new_mtx)
+                np.savez('camera1_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame, I = new_mtx, roi = roi)
                 print("Wrote camera 1 R and t in file.")
             elif camSelect == 2:
-                np.savez('camera2_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame, I = new_mtx)
+                np.savez('camera2_extrinsics.npz', R=rotation_matrix, t=camera_position_in_marker_frame, I = new_mtx, roi = roi)
                 print("Wrote camera 2 R and t in file.")
 
         for i in range(0, ids.size):

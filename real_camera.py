@@ -16,7 +16,8 @@ class custom_real_camera:
                  vidCapID = 0,
                  undistort=False,
                  distortion_coefficients = np.array([0.0, 0.0, 0.0, 0.0, 0.0]),
-                 Inew = np.eye(3)):
+                 Inew = np.eye(3), 
+                 roi = np.array([0, 0, 0, 0])):
         self.cameraID = cameraID
         self.color = color
         self.R = R # from world to camera 
@@ -30,11 +31,12 @@ class custom_real_camera:
         self.resolutionX = camera_resolution[0]
         self.resolutionY = camera_resolution[1]
         self.Inew = Inew
+        self.roi = roi
         self.map1, self.map2 = cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (self.resolutionX, self.resolutionY), 5)
 
         self.image_scale = image_scale
         self.E = create_extrinsic_matrix(self.R.T, self.t)
-        self.P = self.I @ self.E
+        self.P = self.Inew @ self.E
         self.cap = cv2.VideoCapture(vidCapID, cv2.CAP_DSHOW)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolutionX)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolutionY)
@@ -76,16 +78,10 @@ class custom_real_camera:
             return []
         
         d = self.pose_depth
-        f_x = self.I[0, 0]  # Focal length in x direction
-        f_y = self.I[1, 1]  # Focal length in y direction
-        c_x = self.I[0, 2]  # Principal point x-coordinate
-        c_y = self.I[1, 2]  # Principal point y-coordinate
-    
-    # Extract new focal lengths and principal point from the new matrix
-        # f_x = self.I_prime[0, 0]  # Focal length in x direction (undistorted)
-        # f_y = self.I_prime[1, 1]  # Focal length in y direction (undistorted)
-        # c_x = self.I_prime[0, 2]  # Principal point x-coordinate (undistorted)
-        # c_y = self.I_prime[1, 2]  # Principal point y-coordinate (undistorted)
+        f_x = self.Inew[0, 0]  # Focal length in x direction
+        f_y = self.Inew[1, 1]  # Focal length in y direction
+        c_x = self.Inew[0, 2]  # Principal point x-coordinate
+        c_y = self.Inew[1, 2]  # Principal point y-coordinate
         # Convert pixel coordinates to normalized image coordinates
         world_points = []
     
@@ -106,19 +102,20 @@ class custom_real_camera:
         
     
     def Rt2Pose(self, ax, d=1, alpha=.5):
-        f_x = self.I_prime[0, 0]  # Focal length in x direction (mm)
-        f_y = self.I_prime[1, 1]  # Focal length in y direction (mm)
-
+        f_x = self.Inew[0, 0]  # Focal length in x direction (mm)
+        f_y = self.Inew[1, 1]  # Focal length in y direction (mm)
+        print(self.Inew)
         # Sensor size in pixels (can be adjusted)
-        sensor_width = self.resolutionX   # Image width in pixels
-        sensor_height = self.resolutionY  # Image height in pixels
+
+        frame_width = self.roi[2]   # Image width in pixels
+        frame_height = self.roi[3]  # Image height in pixels
 
         # Depth to the base of the pyramid
         d = self.pose_depth * 25.4  # Distance to the base (in arbitrary units, e.g., meters)
 
         # Calculate the base dimensions of the pyramid
-        base_width = (sensor_width / f_x) * d
-        base_height = (sensor_height / f_y) * d
+        base_width = (frame_width / f_x) * d
+        base_height = (frame_height / f_y) * d
         
         # Calculate the vertices of the pyramid
         tip = np.array([0, 0, 0])
@@ -138,22 +135,19 @@ class custom_real_camera:
 
         _, frame = self.cap.read()
         height, width, _ = frame.shape
-        if self.undistort:
-            alpha = .8
-            new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(self.I, self.distortion_coefficients, (width, height), alpha=alpha)
-            frame = cv2.undistort(frame, self.I, self.distortion_coefficients, None, new_camera_matrix)
-            self.I_prime = new_camera_matrix
-        # self.I_prime = new_camera_mtx
-        # self.I = new_camera_mtx
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # undistorted_frame = cv2.remap(frame, self.map1, self.map2, cv2.INTER_LINEAR)
+        # x, y, w, h = self.roi
+        undistorted_frame = cv2.undistort(frame, self.I, self.distortion_coefficients, None, self.Inew)
+        # undistorted_frame = undistorted_frame[y:y+h, x:x+w]
+        undistorted_gray = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2GRAY)
 
         # Threshold the image to get the brite areas
-        _, gray = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY)
+        _, undistorted_gray = cv2.threshold(undistorted_gray, 160, 255, cv2.THRESH_BINARY)
         # scaling_factor = 0.5  # 0.5 reduces brightness by 50%, adjust as needed
         # gray = cv2.convertScaleAbs(gray, alpha=scaling_factor, beta=0)
         # Find contours of the thresholded image
-        contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(undistorted_gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         # Calculate the center coordinates
         
@@ -164,12 +158,12 @@ class custom_real_camera:
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
                 centroids.append([cX, cY])
-                cv2.circle(frame, (cX, cY), 5, (0, 255, 0),thickness=3)
+                cv2.circle(undistorted_frame, (cX, cY), 5, (0, 255, 0),thickness=4)
         self.bright_points = np.array(centroids)
 
         if self.show_img:
             center_x = width // 2
             center_y = height // 2
-            cv2.circle(frame, (center_x, center_y), 4, (0, 0, 255), -1)
-            cv2.imshow(self.color, frame)
-        return frame
+            cv2.circle(undistorted_frame, (center_x, center_y), 4, (0, 0, 255), -1)
+            # cv2.imshow(self.color, undistorted_frame)
+        return undistorted_frame
