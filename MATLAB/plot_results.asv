@@ -1,0 +1,73 @@
+close all;
+% Load the recorded data from CSV
+data = csvread('recorded_data.csv', 1, 0); % Skip the header
+time = data(:,1);
+x = smooth(data(:, 2),50); % X coordinates
+y = smooth(data(:, 3),50); % Y coordinates
+z = smooth(data(:, 4),50); % Z coordinates
+error = data(:, 5); % Errors
+
+dt = mean(diff(time));
+fprintf('Calculated FPS: %.2f\n',1/dt)
+% Create a time vector based on the number of recorded entries
+% time = (1:length(x))'; % Assuming uniform time intervals
+
+% Plotting
+figure;
+
+% 3D Coordinates Plot
+% subplot(2, 1, 1);
+hold on
+scatter3(x, y, z, 20,time,'filled');
+% plot3(x, y, z,'--k');
+a = colorbar;
+a.Label.String = "Time (s)";
+xlabel('X Coordinate');
+ylabel('Y Coordinate');
+zlabel('Z Coordinate');
+title('3D Coordinates Over Time');
+grid on;
+axis equal;
+
+% Error Plot
+% subplot(2, 1, 2);
+figure
+plot(time, error, '-r');
+xlabel('Time Index');
+ylabel('Error');
+title('Error Over Time');
+grid on;
+ylim([-1, 8])
+
+dtv = diff(time);
+vx = diff(x)./dtv;
+vy = diff(y)./dtv;
+vz = diff(z)./dtv;
+
+dta = dtv(2:end);
+ax1 = diff(vx)./dta;
+ay1 = diff(vy)./dta;
+az1 = diff(vz)./dta;
+
+% ax2 = diff(vx)./diff(time(2:end));
+% ay2 = diff(vy)./diff(time(2:end));
+% az2 = diff(vz)./diff(time(2:end));
+
+figure
+plot(time, x);hold on;
+plot(time, y);hold on;
+plot(time, z);hold on;
+
+figure
+plot(cumsum(dt, vx,'--'); hold on;
+plot(time(2:end), vy,'--'); hold on;
+plot(time(2:end), vz,'--'); hold on;
+
+% set(gca, 'colororderindex',1);
+% plot(time(2:end), smooth(vx,10),'--'); hold on;
+% plot(time(2:end), smooth(vy,10),'--'); hold on;
+% plot(time(2:end), smooth(vz,10),'--'); hold on;
+yline(-386);
+% xlim([9.1, 9.5])
+% Save the figure if needed
+% saveas(gcf, '3D_coordinates_and_error.png');

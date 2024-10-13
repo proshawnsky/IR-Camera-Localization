@@ -9,8 +9,8 @@ from utils import *
 import csv
 
 # Options
-show_3D_plot = True
-show_frames = True
+show_3D_plot = False
+show_frames = False  
 print_calculations = True  
 
 # Define Cameras ___________________________________________________________________________________
@@ -91,6 +91,7 @@ while 1: #______________________________________________________________________
     points1 = camera1.camera2world()
     frame2 = camera2.getFrame()
     points2 = camera2.camera2world()
+    
     rays1 = []
     rays2 = []
     ray_plots = []
@@ -102,8 +103,9 @@ while 1: #______________________________________________________________________
             ground_intersection = camera1.t + lam*direction
             ray = np.array([camera1.t, ground_intersection])
             rays1.append(ray)
-            ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
-            ray_plots.append(ray_plot)
+            if show_3D_plot:
+                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
+                ray_plots.append(ray_plot)
     
     
     if len(points2) > 0:
@@ -113,8 +115,9 @@ while 1: #______________________________________________________________________
             ground_intersection = camera2.t + lam*direction
             ray = np.array([camera2.t, ground_intersection])
             rays2.append(ray)
-            ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
-            ray_plots.append(ray_plot)
+            if show_3D_plot:
+                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
+                ray_plots.append(ray_plot)
     
     candidate_points = []
     candidate_point_plots = []
@@ -133,22 +136,25 @@ while 1: #______________________________________________________________________
     closest_approaches.sort(key=lambda x: x[1])  # Sort by distance
     for midpoint, distance in closest_approaches:
         candidate_points.append(midpoint)
-        candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
-        candidate_point_plots.append(candidate_point_plot)
-    for idx, (midpoint, distance) in enumerate(closest_approaches):
-        print(f"Sorted Candidate {idx}: Midpoint {midpoint}, Distance {distance}")
-
-    ax.axis('equal')
-    ax.set(xlim=(-50, 50), ylim=(-50, 50), zlim=(0, 96))
-    plt.pause(.001)
+        if show_3D_plot:
+            candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
+            candidate_point_plots.append(candidate_point_plot)
+    # for idx, (midpoint, distance) in enumerate(closest_approaches):
+        # print(f"Sorted Candidate {idx}: Midpoint {midpoint}, Distance {distance}")
+    # if len(closest_approaches) > 0:
+    #     best_point = closest_approaches[0][0]
+    #     print(f"Best Point: {best_point}")
+    if show_3D_plot:
+        ax.axis('equal')
+        ax.set(xlim=(-50, 50), ylim=(-50, 50), zlim=(0, 96))
+        plt.pause(.001)
     
-
-    if len(ray_plots) > 0:
-        for ray_plot in ray_plots:
-            ray_plot.remove()
-    if len(candidate_point_plots) > 0:
-        for candidate_point_plot in candidate_point_plots:
-            candidate_point_plot.remove()
+        if len(ray_plots) > 0:
+            for ray_plot in ray_plots:
+                ray_plot.remove()
+        if len(candidate_point_plots) > 0:
+            for candidate_point_plot in candidate_point_plots:
+                candidate_point_plot.remove()
          
     if show_frames:
         scale = .8
@@ -167,26 +173,27 @@ while 1: #______________________________________________________________________
         
     # midpoint, distance = closest_approach_between_segments(ray[0], ray_line2)
 
-    # key = cv2.waitKey(1)    
-    # if keyboard.is_pressed('space') or key == 32:  # Space bar
-    #     time.sleep(.3) 
-    #     recording = not recording  # Toggle recording state
-    #     if recording: 
-    #         print("Started recording...")
-    #         start_time = time.time()
-    #     else:
-    #         print("Stopped recording...")
-    #         # Save recorded data to CSV
-    #         with open('MATLAB/recorded_data.csv', mode='w', newline='') as file:
-    #             writer = csv.writer(file)
-    #             writer.writerow(["Time", "X", "Y", "Z", "Error"])  # Header
-    #             writer.writerows(recorded_data)
+    key = cv2.waitKey(1)    
+    if keyboard.is_pressed('space') or key == 32:  # Space bar
+        time.sleep(.3) 
+        recording = not recording  # Toggle recording state
+        if recording: 
+            print("Started recording...")
+            start_time = time.time()
+        else:
+            print("Stopped recording...")
+            # Save recorded data to CSV
+            with open('MATLAB/recorded_data.csv', mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(["Time", "X", "Y", "Z", "Error"])  # Header
+                writer.writerows(recorded_data)
 
-    # # Record the midpoint and error if recording is active
-    # if recording:
-    #     elapsed_time = time.time() - start_time
-    #     if distance <= 4:  # Threshold to consider a successful approach
-    #         recorded_data.append([elapsed_time, midpoint[0], midpoint[1], midpoint[2], distance])
-    #         if print_calculations:
-    #             print(f"Time: {elapsed_time:.2f} s, Midpoint: {midpoint}, Error: {distance}")
+    # Record the midpoint and error if recording is active
+    if recording:
+        elapsed_time = time.time() - start_time
+        if len(closest_approaches) > 0:  # Threshold to consider a successful approach
+            midpoint = closest_approaches[0][0]
+            recorded_data.append([elapsed_time, midpoint[0], midpoint[1], midpoint[2], distance])
+            if print_calculations:
+                print(f"Time: {elapsed_time:.2f} s, Midpoint: {midpoint}, Error: {distance}")
  
