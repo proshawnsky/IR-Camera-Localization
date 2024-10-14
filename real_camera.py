@@ -32,12 +32,11 @@ class custom_real_camera:
         self.resolutionY = camera_resolution[1]
         self.Inew = Inew
         self.roi = roi
-        # map1, map2 =           cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (frame.shape[1], frame.shape[0]), cv2.CV_16SC2)
         self.map1, self.map2 = cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (self.roi[2], self.roi[3]),  cv2.CV_16SC2)
-
         self.image_scale = image_scale
         self.E = create_extrinsic_matrix(self.R.T, self.t)
-        self.P = self.Inew @ self.E
+        t_temp = -self.R.T @ self.t.reshape(-1,1)
+        self.P = self.Inew @ np.hstack((self.R.T, t_temp))  # Projection matrix for camera 1
         self.cap = cv2.VideoCapture(vidCapID, cv2.CAP_DSHOW)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolutionX)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolutionY)
@@ -85,7 +84,7 @@ class custom_real_camera:
         c_y = self.Inew[1, 2]  # Principal point y-coordinate
         # Convert pixel coordinates to normalized image coordinates
         world_points = []
-    
+
     # Loop over each bright point
         for point in self.bright_points:
             u, v = point  # Extract u and v from each bright point
@@ -157,11 +156,11 @@ class custom_real_camera:
                 cY = int(M["m01"] / M["m00"])
                 centroids.append([cX, cY])
                 cv2.circle(undistorted_frame, (cX, cY), 5, (0, 255, 0),thickness=4)
-        self.bright_points = np.array(centroids)
+        self.bright_points = centroids
 
         # if self.show_img:
         #     center_x = width // 2
         #     center_y = height // 2
         #     cv2.circle(undistorted_frame, (center_x, center_y), 4, (0, 0, 255), -1)
             # cv2.imshow(self.color, undistorted_frame)
-        return undistorted_frame
+        return undistorted_frame, centroids

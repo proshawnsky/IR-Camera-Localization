@@ -8,9 +8,9 @@ from real_camera import custom_real_camera
 from utils import *
 import csv
 
-# Options    b
-show_3D_plot = False
-show_frames = False    
+# Options 
+show_3D_plot = True
+show_frames = False      
 print_calculations = True  
 reprojection_error_threshold = 2
 
@@ -75,6 +75,14 @@ if show_3D_plot:
 recording = False
 recorded_data = []  # To store the recorded values
 
+# print(camera1.Inew)
+# print(camera1.R)
+# print(camera1.t)
+# cam1_t = -camera1.R.T @ camera1.t.reshape(-1,1)
+# cam2_t = -camera2.R.T @ camera2.t.reshape(-1,1)
+# P1 = camera1.Inew @ np.hstack((camera1.R.T, cam1_t))  # Projection matrix for camera 1
+# P2 = camera2.Inew @ np.hstack((camera2.R.T, cam2_t))  # Projection matrix for camera 2
+
 while 1: #______________________________________________________________________________________________
     if keyboard.is_pressed('esc'): 
         print('Seeyuh!')
@@ -82,11 +90,26 @@ while 1: #______________________________________________________________________
         cv2.destroyAllWindows()
         break
 
-    frame1 = camera1.getFrame()
+    frame1, centroids1 = camera1.getFrame()
     points1 = camera1.camera2world()
-    frame2 = camera2.getFrame()
+    frame2, centroids2 = camera2.getFrame()
     points2 = camera2.camera2world()
     
+    if len(centroids1) > 0 and len(centroids2) > 0:
+        centroid1 = np.array(centroids1[0], dtype=np.float32) 
+        centroid2 = np.array(centroids2[0], dtype=np.float32) 
+
+        point_4D_homogeneous = cv2.triangulatePoints(camera1.P, camera2.P, centroid1, centroid2)
+
+        # Convert homogeneous 4D point to 3D
+        point_3D = (point_4D_homogeneous[:3] / point_4D_homogeneous[3]).reshape(-1)
+
+        # print(point_3D)
+        if show_3D_plot:
+            point_3D_plot = ax.scatter(point_3D[0], point_3D[1], point_3D[2], color='black', marker='o')
+
+
+
     rays1 = []
     rays2 = []
     ray_plots = []
@@ -123,7 +146,8 @@ while 1: #______________________________________________________________________
             if closest_approach_distance < reprojection_error_threshold: # if the two rays form a close enough point...
                 candidate_points.append((midpoint, closest_approach_distance)) # add to the list of resolved 3D points
                 if print_calculations:
-                    print(f"Candidate from Ray {idx1} and Ray {idx2}: Midpoint {midpoint}, Reprojection Error {closest_approach_distance}")
+                    print(point_3D -midpoint)
+                    # print(f"Candidate from Ray {idx1} and Ray {idx2}: Midpoint {midpoint}, Reprojection Error {closest_approach_distance}")
                 if show_3D_plot:
                     candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
                     candidate_point_plots.append(candidate_point_plot)
@@ -139,7 +163,9 @@ while 1: #______________________________________________________________________
         if len(ray_plots) > 0:
             for ray_plot in ray_plots:
                 ray_plot.remove()
+                
         if len(candidate_point_plots) > 0:
+            point_3D_plot.remove()
             for candidate_point_plot in candidate_point_plots:
                 candidate_point_plot.remove()
          
