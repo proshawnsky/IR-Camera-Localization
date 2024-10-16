@@ -166,7 +166,19 @@ def closest_approach_between_segments(ray1, ray2):
     closest_approach_distance = np.linalg.norm(closest_point_on_ray1 - closest_point_on_ray2)
     
     return midpoint, closest_approach_distance
+def triangulate(cam1_rays, cam2_rays):
 
+
+    points3D = []
+    reprojection_errors = []
+    
+    if len(cam1_rays) > 0 and len(cam2_rays) > 0:
+        for ray1 in cam1_rays:
+            for ray2 in cam2_rays:
+                midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2)
+                points3D.append(midpoint)
+                reprojection_errors.append(closest_approach_distance)
+    return points3D, reprojection_errors
 
 
 

@@ -66,12 +66,6 @@ class custom_real_camera:
         point_frame = self.P @ point_world_aug # (4x4)@(4x1) = (4x1) homogeneous coordinates
         self.point_frame = point_frame[:2]/point_frame[2] # keep only the first two coordinates and normalize
         return point_frame[:2]/point_frame[2]
-    
-    def world2camera_est(self, point_world):
-        point_world_aug = np.append(point_world, 1).reshape(-1) # convert to homogeneous coordinates
-        point_frame = self.P_est @ point_world_aug # (4x4)@(4x1) = (4x1) homogeneous coordinates
-        self.point_frame = point_frame[:2]/point_frame[2] # keep only the first two coordinates and normalize
-        return point_frame[:2]/point_frame[2]
 
     def camera2world(self):
         if not hasattr(self, 'bright_points') or len(self.bright_points) == 0:
@@ -155,7 +149,7 @@ class custom_real_camera:
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
                 centroids.append([cX, cY])
-                cv2.circle(undistorted_frame, (cX, cY), 5, (0, 255, 0),thickness=4)
+                cv2.circle(undistorted_frame, (cX, cY), 15, (0, 255, 0),thickness=2)
         self.bright_points = centroids
 
         # if self.show_img:
@@ -164,3 +158,25 @@ class custom_real_camera:
         #     cv2.circle(undistorted_frame, (center_x, center_y), 4, (0, 0, 255), -1)
             # cv2.imshow(self.color, undistorted_frame)
         return undistorted_frame, centroids
+    
+    def pixels2rays(self, depth = 150):
+
+        f_x = self.Inew[0, 0]  # Focal length in x direction
+        f_y = self.Inew[1, 1]  # Focal length in y direction
+        c_x = self.Inew[0, 2]  # Principal point x-coordinate
+        c_y = self.Inew[1, 2]  # Principal point y-coordinate
+
+        rays = []
+
+        for point in self.bright_points:
+            u, v = point
+            x_norm = (u - c_x) / f_x
+            y_norm = (v - c_y) / f_y
+            point_on_base = np.array([x_norm * depth, y_norm * depth, depth])
+            
+            # Apply rotation and translation to transform to world coordinates
+            point_in_world = (self.R @ point_on_base.T) + self.t
+            ray = np.array([self.t, point_in_world])
+            rays.append(ray)
+
+        return rays

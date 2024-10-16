@@ -10,9 +10,9 @@ import csv
 
 # Options 
 show_3D_plot = True
-show_frames = False      
+show_frames = True      
 print_calculations = True  
-reprojection_error_threshold = 2
+reprojection_error_threshold = .3
 
 # Define Cameras ___________________________________________________________________________________
 cam1_intrinsics = np.load('camera1_calibration.npz')
@@ -42,15 +42,15 @@ camera2 = custom_real_camera(R = R2,
                        distortion_coefficients = dist_coeffs2, undistort=False, cameraID=2, roi = roi2)
 
 all_cameras = [camera1, camera2]
-
+print("Ready")
 # Set up the Wqorld 3D Plot ____________________________________________________________________________
 if show_3D_plot:
     fig = plt.figure(1,figsize=(20, 12))
     manager = plt.get_current_fig_manager()
     # manager.window.wm_geometry("+0+0") 
 
-    ax = fig.add_subplot(111, projection='3d')
-    plot_aruco_grid(ax)
+    ax = fig.add_subplot(111, projection='3d')  
+    # plot_aruco_grid(ax)
     plot_coordinate_system(ax,length=6) # plot wworld coordinate system
 
     ax.grid(True)
@@ -75,14 +75,6 @@ if show_3D_plot:
 recording = False
 recorded_data = []  # To store the recorded values
 
-# print(camera1.Inew)
-# print(camera1.R)
-# print(camera1.t)
-# cam1_t = -camera1.R.T @ camera1.t.reshape(-1,1)
-# cam2_t = -camera2.R.T @ camera2.t.reshape(-1,1)
-# P1 = camera1.Inew @ np.hstack((camera1.R.T, cam1_t))  # Projection matrix for camera 1
-# P2 = camera2.Inew @ np.hstack((camera2.R.T, cam2_t))  # Projection matrix for camera 2
-
 while 1: #______________________________________________________________________________________________
     if keyboard.is_pressed('esc'): 
         print('Seeyuh!')
@@ -91,73 +83,43 @@ while 1: #______________________________________________________________________
         break
 
     frame1, centroids1 = camera1.getFrame()
-    points1 = camera1.camera2world()
     frame2, centroids2 = camera2.getFrame()
-    points2 = camera2.camera2world()
-    
-    if len(centroids1) > 0 and len(centroids2) > 0:
-        centroid1 = np.array(centroids1[0], dtype=np.float32) 
-        centroid2 = np.array(centroids2[0], dtype=np.float32) 
 
-        point_4D_homogeneous = cv2.triangulatePoints(camera1.P, camera2.P, centroid1, centroid2)
-
-        # Convert homogeneous 4D point to 3D
-        point_3D = (point_4D_homogeneous[:3] / point_4D_homogeneous[3]).reshape(-1)
-
-        # print(point_3D)
-        if show_3D_plot:
-            point_3D_plot = ax.scatter(point_3D[0], point_3D[1], point_3D[2], color='black', marker='o')
-
-
-
-    rays1 = []
-    rays2 = []
-    ray_plots = []
-
-    if len(points1) > 0:
-        for idx, point in enumerate(points1):
-            direction = point - camera1.t
-            lam = -camera1.t[2] / direction[2] # calculate intersection with z=0 plane
-            ground_intersection = camera1.t + lam*direction
-            ray = np.array([camera1.t, ground_intersection])
-            rays1.append(ray)
-            if show_3D_plot:
-                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
+    cam1_rays = camera1.pixels2rays()
+    cam2_rays = camera2.pixels2rays()
+    points3D, reprojection_errors = triangulate(camera1.pixels2rays(), camera2.pixels2rays())
+   
+    if show_3D_plot:
+        ray_plots = []
+        if len(cam1_rays) > 0:
+            for ray in cam1_rays:
+                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='red',lw = .5)
                 ray_plots.append(ray_plot)
-    
-    
-    if len(points2) > 0:
-        for idx, point in enumerate(points2):
-            direction = point - camera2.t
-            lam = -camera2.t[2] / direction[2] # calculate intersection with z=0 plane
-            ground_intersection = camera2.t + lam*direction
-            ray = np.array([camera2.t, ground_intersection])
-            rays2.append(ray)
-            if show_3D_plot:
-                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
+        if len(cam2_rays) > 0:
+            for ray in cam2_rays:
+                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='blue',lw = .5)
                 ray_plots.append(ray_plot)
     
     candidate_points = []
     candidate_point_plots = []
-    closest_approaches = []  # List to hold tuples of (midpoint, closest_approach_distance)
-    for idx1, ray1 in enumerate(rays1):
-        for idx2, ray2 in enumerate(rays2):
-            midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2) # find where the rays almost intersect
-            if closest_approach_distance < reprojection_error_threshold: # if the two rays form a close enough point...
-                candidate_points.append((midpoint, closest_approach_distance)) # add to the list of resolved 3D points
-                if print_calculations:
-                    print(point_3D -midpoint)
-                    # print(f"Candidate from Ray {idx1} and Ray {idx2}: Midpoint {midpoint}, Reprojection Error {closest_approach_distance}")
-                if show_3D_plot:
-                    candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
-                    candidate_point_plots.append(candidate_point_plot)
+    
+    
+    for idx, point in enumerate(points3D):
+        if reprojection_errors[idx] < reprojection_error_threshold and point[2] > -.1:
+            candidate_points.append((point, reprojection_errors[idx]))
+            if print_calculations:  
+                print(f"Midpoint: {point}, Reprojection Error: {reprojection_errors[idx]}")
+
+            if show_3D_plot:
+                point_3D_plot, = ax.plot(point[0], point[1], point[2], 'o', color='black')
+                candidate_point_plots.append(point_3D_plot)
 
     # Sort the candidates list by the second element (closest_approach_distance)
     candidate_points.sort(key=lambda x: x[1])  # Sort by distance
   
     if show_3D_plot:
         ax.axis('equal')
-        ax.set(xlim=(-50, 50), ylim=(-50, 50), zlim=(0, 96))
+        ax.set(xlim=(-40, 40), ylim=(-40, 40), zlim=(0, 70))
         plt.pause(.001)
     
         if len(ray_plots) > 0:
@@ -165,7 +127,6 @@ while 1: #______________________________________________________________________
                 ray_plot.remove()
                 
         if len(candidate_point_plots) > 0:
-            point_3D_plot.remove()
             for candidate_point_plot in candidate_point_plots:
                 candidate_point_plot.remove()
          
