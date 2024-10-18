@@ -11,7 +11,7 @@ import csv
 # Options 
 show_3D_plot = True
 show_frames = True      
-print_calculations = True  
+print_calculations = False  
 reprojection_error_threshold = .3
 
 # Define Cameras ___________________________________________________________________________________
@@ -33,6 +33,9 @@ I2 = cam2_intrinsics['I']
 dist_coeffs2 = cam2_intrinsics['dist_coeffs']
 cam2_extrinsics = np.load('camera2_extrinsics.npz')
 R2 = cam2_extrinsics['R'].T # marker position in camera frame
+R2 = np.array([[-0.76025913,  0.44546225, -0.47283131],
+            [ 0.64903535,  0.55173292, -0.52377848],
+            [ 0.02755306, -0.7050916,  -0.70858074]]) #optimized???????
 t2 = cam2_extrinsics['t'].reshape(-1)
 Inew2 = cam2_extrinsics['I'] # AFTER UNDISTORTION
 roi2 = cam2_extrinsics['roi']
@@ -109,14 +112,16 @@ while 1: #______________________________________________________________________
             candidate_points.append((point, reprojection_errors[idx]))
             if print_calculations:  
                 print(f"Midpoint: {point}, Reprojection Error: {reprojection_errors[idx]}")
-
+                
             if show_3D_plot:
                 point_3D_plot, = ax.plot(point[0], point[1], point[2], 'o', color='black')
                 candidate_point_plots.append(point_3D_plot)
 
     # Sort the candidates list by the second element (closest_approach_distance)
     candidate_points.sort(key=lambda x: x[1])  # Sort by distance
-  
+    print([error for _, error in candidate_points])
+
+
     if show_3D_plot:
         ax.axis('equal')
         ax.set(xlim=(-40, 40), ylim=(-40, 40), zlim=(0, 70))

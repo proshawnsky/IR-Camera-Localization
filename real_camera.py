@@ -98,7 +98,6 @@ class custom_real_camera:
     def Rt2Pose(self, ax, d=1, alpha=.5):
         f_x = self.Inew[0, 0]  # Focal length in x direction (mm)
         f_y = self.Inew[1, 1]  # Focal length in y direction (mm)
-        print(self.Inew)
         # Sensor size in pixels (can be adjusted)
 
         frame_width = self.roi[2]   # Image width in pixels

@@ -178,6 +178,8 @@ def triangulate(cam1_rays, cam2_rays):
                 midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2)
                 points3D.append(midpoint)
                 reprojection_errors.append(closest_approach_distance)
+
+                
     return points3D, reprojection_errors
 
 
