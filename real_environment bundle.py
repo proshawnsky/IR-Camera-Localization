@@ -113,12 +113,13 @@ initial_params = np.hstack([R.from_matrix(camera2.R).as_rotvec()])
 
 result = least_squares(get_reprojection_error, initial_params,
                        args=(),
-                       method='trf')
+                       method='lm')
     
 optimized_r2 = result.x[:3]
 # optimized_t2 = result.x[3:6]
 R2_optimized = R.from_rotvec(optimized_r2).as_matrix()
 camera2.R = R2_optimized
+# camera2.t = optimized_t2
 print("Optimized R2:", R2_optimized)
 # camera2.t = optimized_t2
 camera2.Rt2Pose(ax) # plot camera pose

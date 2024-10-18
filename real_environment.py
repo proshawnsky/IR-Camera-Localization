@@ -33,9 +33,9 @@ I2 = cam2_intrinsics['I']
 dist_coeffs2 = cam2_intrinsics['dist_coeffs']
 cam2_extrinsics = np.load('camera2_extrinsics.npz')
 R2 = cam2_extrinsics['R'].T # marker position in camera frame
-R2 = np.array([[-0.76025913,  0.44546225, -0.47283131],
-            [ 0.64903535,  0.55173292, -0.52377848],
-            [ 0.02755306, -0.7050916,  -0.70858074]]) #optimized???????
+R2 = np.array([[-0.75947653,  0.44870444, -0.47101988],
+            [ 0.65019899,  0.54683468, -0.5274591 ],
+            [ 0.02089677, -0.70684946, -0.70705528]]) #optimized???????
 t2 = cam2_extrinsics['t'].reshape(-1)
 Inew2 = cam2_extrinsics['I'] # AFTER UNDISTORTION
 roi2 = cam2_extrinsics['roi']

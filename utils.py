@@ -4,6 +4,7 @@ from scipy.linalg import svd
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.patches import Rectangle
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from scipy.spatial.transform import Rotation as R
 
 def normalize_dcm(dcm):
     # Calculate the inverse of the DCM
@@ -179,9 +180,8 @@ def triangulate(cam1_rays, cam2_rays):
                 points3D.append(midpoint)
                 reprojection_errors.append(closest_approach_distance)
 
-                
-    return points3D, reprojection_errors
 
+    return points3D, reprojection_errors
 
 
 
