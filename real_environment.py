@@ -7,11 +7,12 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from real_camera import custom_real_camera
 from utils import *
 import csv
+import itertools
 
 # Options 
 show_3D_plot = True
 show_frames = True      
-print_calculations = True  
+print_calculations = False  
 reprojection_error_threshold = .3
 
 # Define Cameras ___________________________________________________________________________________
@@ -74,7 +75,9 @@ if show_3D_plot:
 # set up recording
 recording = False
 recorded_data = []  # To store the recorded values
-
+known_distances = np.array([7.339773093282274, 9.066638128175956, 11.75268715661555]) # real triangle dimensions (shinches)
+triangle_plot = None
+reprojection_error_threshold = .5
 while 1: #______________________________________________________________________________________________
     if keyboard.is_pressed('esc'): 
         print('Seeyuh!')
@@ -88,7 +91,41 @@ while 1: #______________________________________________________________________
     cam1_rays = camera1.pixels2rays()
     cam2_rays = camera2.pixels2rays()
     points3D, reprojection_errors = triangulate(camera1.pixels2rays(), camera2.pixels2rays())
-   
+    
+    filtered_points = []
+    filtered_errors = []
+
+    for point, error in zip(points3D, reprojection_errors):
+        if error <= reprojection_error_threshold:
+            filtered_points.append(point)
+            filtered_errors.append(error)
+
+    print(filtered_errors)
+    possible_triangles = list(itertools.combinations(filtered_points, 3))
+    best_triangle = None
+    min_error = float('inf')
+
+    for triangle in possible_triangles:
+        error = triangle_similarity(triangle, known_distances)
+        if error < min_error and error < 1:
+            min_error = error
+            best_triangle = triangle
+    
+    if triangle_plot is not None:
+        triangle_plot.remove()
+
+    if best_triangle is not None:
+        p1, p2, p3 = best_triangle
+        # Create arrays for plotting
+        x_vals = [p1[0], p2[0], p3[0], p1[0]]
+        y_vals = [p1[1], p2[1], p3[1], p1[1]]
+        z_vals = [p1[2], p2[2], p3[2], p1[2]]
+
+        # Plot the triangle lines
+        triangle_plot, = ax.plot(x_vals, y_vals, z_vals, 'b-o', label='Best Triangle')
+    else:
+        triangle_plot = None
+    # Plot the rays
     if show_3D_plot:
         ray_plots = []
         if len(cam1_rays) > 0:
@@ -110,9 +147,9 @@ while 1: #______________________________________________________________________
             if print_calculations:  
                 print(f"Midpoint: {point}, Reprojection Error: {reprojection_errors[idx]}")
 
-            if show_3D_plot:
-                point_3D_plot, = ax.plot(point[0], point[1], point[2], 'o', color='black')
-                candidate_point_plots.append(point_3D_plot)
+            # if show_3D_plot:
+            #     point_3D_plot, = ax.plot(point[0], point[1], point[2], 'o', color='black')
+            #     candidate_point_plots.append(point_3D_plot)
 
     # Sort the candidates list by the second element (closest_approach_distance)
     candidate_points.sort(key=lambda x: x[1])  # Sort by distance

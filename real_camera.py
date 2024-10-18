@@ -98,7 +98,6 @@ class custom_real_camera:
     def Rt2Pose(self, ax, d=1, alpha=.5):
         f_x = self.Inew[0, 0]  # Focal length in x direction (mm)
         f_y = self.Inew[1, 1]  # Focal length in y direction (mm)
-        print(self.Inew)
         # Sensor size in pixels (can be adjusted)
 
         frame_width = self.roi[2]   # Image width in pixels
@@ -130,6 +129,7 @@ class custom_real_camera:
         _, frame = self.cap.read()
         # height, width, _ = frame.shape
 
+        frame = cv2.GaussianBlur(frame, (15, 15), 0)
         undistorted_frame = cv2.remap(frame, self.map1, self.map2, interpolation=cv2.INTER_LINEAR)   
         undistorted_gray = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2GRAY)
 
@@ -149,7 +149,7 @@ class custom_real_camera:
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
                 centroids.append([cX, cY])
-                cv2.circle(undistorted_frame, (cX, cY), 15, (0, 255, 0),thickness=2)
+                cv2.circle(undistorted_frame, (cX, cY), 5, (0, 255, 0),thickness=2)
         self.bright_points = centroids
 
         # if self.show_img:
