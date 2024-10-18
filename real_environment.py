@@ -7,12 +7,13 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from real_camera import custom_real_camera
 from utils import *
 import csv
+import itertools
 
-# Options    b
-show_3D_plot = False
-show_frames = False    
-print_calculations = True  
-reprojection_error_threshold = 2
+# Options 
+show_3D_plot = True
+show_frames = True      
+print_calculations = False  
+reprojection_error_threshold = .3
 
 # Define Cameras ___________________________________________________________________________________
 cam1_intrinsics = np.load('camera1_calibration.npz')
@@ -42,15 +43,15 @@ camera2 = custom_real_camera(R = R2,
                        distortion_coefficients = dist_coeffs2, undistort=False, cameraID=2, roi = roi2)
 
 all_cameras = [camera1, camera2]
-
+print("Ready")
 # Set up the Wqorld 3D Plot ____________________________________________________________________________
 if show_3D_plot:
     fig = plt.figure(1,figsize=(20, 12))
     manager = plt.get_current_fig_manager()
     # manager.window.wm_geometry("+0+0") 
 
-    ax = fig.add_subplot(111, projection='3d')
-    plot_aruco_grid(ax)
+    ax = fig.add_subplot(111, projection='3d')  
+    # plot_aruco_grid(ax)
     plot_coordinate_system(ax,length=6) # plot wworld coordinate system
 
     ax.grid(True)
@@ -74,7 +75,9 @@ if show_3D_plot:
 # set up recording
 recording = False
 recorded_data = []  # To store the recorded values
-
+known_distances = np.array([7.339773093282274, 9.066638128175956, 11.75268715661555]) # real triangle dimensions (shinches)
+triangle_plot = None
+reprojection_error_threshold = .5
 while 1: #______________________________________________________________________________________________
     if keyboard.is_pressed('esc'): 
         print('Seeyuh!')
@@ -82,63 +85,84 @@ while 1: #______________________________________________________________________
         cv2.destroyAllWindows()
         break
 
-    frame1 = camera1.getFrame()
-    points1 = camera1.camera2world()
-    frame2 = camera2.getFrame()
-    points2 = camera2.camera2world()
-    
-    rays1 = []
-    rays2 = []
-    ray_plots = []
+    frame1, centroids1 = camera1.getFrame()
+    frame2, centroids2 = camera2.getFrame()
 
-    if len(points1) > 0:
-        for idx, point in enumerate(points1):
-            direction = point - camera1.t
-            lam = -camera1.t[2] / direction[2] # calculate intersection with z=0 plane
-            ground_intersection = camera1.t + lam*direction
-            ray = np.array([camera1.t, ground_intersection])
-            rays1.append(ray)
-            if show_3D_plot:
-                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
+    cam1_rays = camera1.pixels2rays()
+    cam2_rays = camera2.pixels2rays()
+    points3D, reprojection_errors = triangulate(camera1.pixels2rays(), camera2.pixels2rays())
+    
+    filtered_points = []
+    filtered_errors = []
+
+    for point, error in zip(points3D, reprojection_errors):
+        if error <= reprojection_error_threshold:
+            filtered_points.append(point)
+            filtered_errors.append(error)
+
+    print(filtered_errors)
+    possible_triangles = list(itertools.combinations(filtered_points, 3))
+    best_triangle = None
+    min_error = float('inf')
+
+    for triangle in possible_triangles:
+        error = triangle_similarity(triangle, known_distances)
+        if error < min_error and error < 1:
+            min_error = error
+            best_triangle = triangle
+    
+    if triangle_plot is not None:
+        triangle_plot.remove()
+
+    if best_triangle is not None:
+        p1, p2, p3 = best_triangle
+        # Create arrays for plotting
+        x_vals = [p1[0], p2[0], p3[0], p1[0]]
+        y_vals = [p1[1], p2[1], p3[1], p1[1]]
+        z_vals = [p1[2], p2[2], p3[2], p1[2]]
+
+        # Plot the triangle lines
+        triangle_plot, = ax.plot(x_vals, y_vals, z_vals, 'b-o', label='Best Triangle')
+    else:
+        triangle_plot = None
+    # Plot the rays
+    if show_3D_plot:
+        ray_plots = []
+        if len(cam1_rays) > 0:
+            for ray in cam1_rays:
+                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='red',lw = .5)
                 ray_plots.append(ray_plot)
-    
-    
-    if len(points2) > 0:
-        for idx, point in enumerate(points2):
-            direction = point - camera2.t
-            lam = -camera2.t[2] / direction[2] # calculate intersection with z=0 plane
-            ground_intersection = camera2.t + lam*direction
-            ray = np.array([camera2.t, ground_intersection])
-            rays2.append(ray)
-            if show_3D_plot:
-                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='green')
+        if len(cam2_rays) > 0:
+            for ray in cam2_rays:
+                ray_plot, = ax.plot(ray[:,0], ray[:,1], ray[:,2], color='blue',lw = .5)
                 ray_plots.append(ray_plot)
     
     candidate_points = []
     candidate_point_plots = []
-    closest_approaches = []  # List to hold tuples of (midpoint, closest_approach_distance)
-    for idx1, ray1 in enumerate(rays1):
-        for idx2, ray2 in enumerate(rays2):
-            midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2) # find where the rays almost intersect
-            if closest_approach_distance < reprojection_error_threshold: # if the two rays form a close enough point...
-                candidate_points.append((midpoint, closest_approach_distance)) # add to the list of resolved 3D points
-                if print_calculations:
-                    print(f"Candidate from Ray {idx1} and Ray {idx2}: Midpoint {midpoint}, Reprojection Error {closest_approach_distance}")
-                if show_3D_plot:
-                    candidate_point_plot, = ax.plot(midpoint[0], midpoint[1], midpoint[2], 'o', color='red')
-                    candidate_point_plots.append(candidate_point_plot)
+    
+    
+    for idx, point in enumerate(points3D):
+        if reprojection_errors[idx] < reprojection_error_threshold and point[2] > -.1:
+            candidate_points.append((point, reprojection_errors[idx]))
+            if print_calculations:  
+                print(f"Midpoint: {point}, Reprojection Error: {reprojection_errors[idx]}")
+
+            # if show_3D_plot:
+            #     point_3D_plot, = ax.plot(point[0], point[1], point[2], 'o', color='black')
+            #     candidate_point_plots.append(point_3D_plot)
 
     # Sort the candidates list by the second element (closest_approach_distance)
     candidate_points.sort(key=lambda x: x[1])  # Sort by distance
   
     if show_3D_plot:
         ax.axis('equal')
-        ax.set(xlim=(-50, 50), ylim=(-50, 50), zlim=(0, 96))
+        ax.set(xlim=(-40, 40), ylim=(-40, 40), zlim=(0, 70))
         plt.pause(.001)
     
         if len(ray_plots) > 0:
             for ray_plot in ray_plots:
                 ray_plot.remove()
+                
         if len(candidate_point_plots) > 0:
             for candidate_point_plot in candidate_point_plots:
                 candidate_point_plot.remove()

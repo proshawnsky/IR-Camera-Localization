@@ -32,12 +32,11 @@ class custom_real_camera:
         self.resolutionY = camera_resolution[1]
         self.Inew = Inew
         self.roi = roi
-        # map1, map2 =           cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (frame.shape[1], frame.shape[0]), cv2.CV_16SC2)
         self.map1, self.map2 = cv2.initUndistortRectifyMap(self.I, self.distortion_coefficients, None, self.Inew, (self.roi[2], self.roi[3]),  cv2.CV_16SC2)
-
         self.image_scale = image_scale
         self.E = create_extrinsic_matrix(self.R.T, self.t)
-        self.P = self.Inew @ self.E
+        t_temp = -self.R.T @ self.t.reshape(-1,1)
+        self.P = self.Inew @ np.hstack((self.R.T, t_temp))  # Projection matrix for camera 1
         self.cap = cv2.VideoCapture(vidCapID, cv2.CAP_DSHOW)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolutionX)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolutionY)
@@ -67,12 +66,6 @@ class custom_real_camera:
         point_frame = self.P @ point_world_aug # (4x4)@(4x1) = (4x1) homogeneous coordinates
         self.point_frame = point_frame[:2]/point_frame[2] # keep only the first two coordinates and normalize
         return point_frame[:2]/point_frame[2]
-    
-    def world2camera_est(self, point_world):
-        point_world_aug = np.append(point_world, 1).reshape(-1) # convert to homogeneous coordinates
-        point_frame = self.P_est @ point_world_aug # (4x4)@(4x1) = (4x1) homogeneous coordinates
-        self.point_frame = point_frame[:2]/point_frame[2] # keep only the first two coordinates and normalize
-        return point_frame[:2]/point_frame[2]
 
     def camera2world(self):
         if not hasattr(self, 'bright_points') or len(self.bright_points) == 0:
@@ -85,7 +78,7 @@ class custom_real_camera:
         c_y = self.Inew[1, 2]  # Principal point y-coordinate
         # Convert pixel coordinates to normalized image coordinates
         world_points = []
-    
+
     # Loop over each bright point
         for point in self.bright_points:
             u, v = point  # Extract u and v from each bright point
@@ -105,7 +98,6 @@ class custom_real_camera:
     def Rt2Pose(self, ax, d=1, alpha=.5):
         f_x = self.Inew[0, 0]  # Focal length in x direction (mm)
         f_y = self.Inew[1, 1]  # Focal length in y direction (mm)
-        print(self.Inew)
         # Sensor size in pixels (can be adjusted)
 
         frame_width = self.roi[2]   # Image width in pixels
@@ -137,6 +129,7 @@ class custom_real_camera:
         _, frame = self.cap.read()
         # height, width, _ = frame.shape
 
+        frame = cv2.GaussianBlur(frame, (15, 15), 0)
         undistorted_frame = cv2.remap(frame, self.map1, self.map2, interpolation=cv2.INTER_LINEAR)   
         undistorted_gray = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2GRAY)
 
@@ -156,12 +149,34 @@ class custom_real_camera:
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
                 centroids.append([cX, cY])
-                cv2.circle(undistorted_frame, (cX, cY), 5, (0, 255, 0),thickness=4)
-        self.bright_points = np.array(centroids)
+                cv2.circle(undistorted_frame, (cX, cY), 5, (0, 255, 0),thickness=2)
+        self.bright_points = centroids
 
         # if self.show_img:
         #     center_x = width // 2
         #     center_y = height // 2
         #     cv2.circle(undistorted_frame, (center_x, center_y), 4, (0, 0, 255), -1)
             # cv2.imshow(self.color, undistorted_frame)
-        return undistorted_frame
+        return undistorted_frame, centroids
+    
+    def pixels2rays(self, depth = 150):
+
+        f_x = self.Inew[0, 0]  # Focal length in x direction
+        f_y = self.Inew[1, 1]  # Focal length in y direction
+        c_x = self.Inew[0, 2]  # Principal point x-coordinate
+        c_y = self.Inew[1, 2]  # Principal point y-coordinate
+
+        rays = []
+
+        for point in self.bright_points:
+            u, v = point
+            x_norm = (u - c_x) / f_x
+            y_norm = (v - c_y) / f_y
+            point_on_base = np.array([x_norm * depth, y_norm * depth, depth])
+            
+            # Apply rotation and translation to transform to world coordinates
+            point_in_world = (self.R @ point_on_base.T) + self.t
+            ray = np.array([self.t, point_in_world])
+            rays.append(ray)
+
+        return rays

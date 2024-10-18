@@ -166,9 +166,35 @@ def closest_approach_between_segments(ray1, ray2):
     closest_approach_distance = np.linalg.norm(closest_point_on_ray1 - closest_point_on_ray2)
     
     return midpoint, closest_approach_distance
+def triangulate(cam1_rays, cam2_rays):
 
 
+    points3D = []
+    reprojection_errors = []
+    
+    if len(cam1_rays) > 0 and len(cam2_rays) > 0:
+        for ray1 in cam1_rays:
+            for ray2 in cam2_rays:
+                midpoint, closest_approach_distance = closest_approach_between_segments(ray1, ray2)
+                points3D.append(midpoint)
+                reprojection_errors.append(closest_approach_distance)
+    return points3D, reprojection_errors
 
+def triangle_similarity(triangle, known_triangle):
+    p1, p2, p3 = triangle
 
+    # Calculate the distances between the three points
+    d1 = distance(p1, p2)
+    d2 = distance(p2, p3)
+    d3 = distance(p1, p3)
+    # d1, d2, d3 = sorted([d1, d2, d3], reverse=True)
+    # Sort distances to compare with the known right triangle (hypotenuse should be largest)
+    distances = sorted([d1, d2, d3])
+    
+    # Calculate the sum of squared differences
+    error = (distances[0] - known_triangle[0])**2 + (distances[1] - known_triangle[1])**2 + (distances[2] - known_triangle[2])**2
+    return error
 
+def distance(p1, p2):
+    return np.linalg.norm(np.array(p1) - np.array(p2))
 
